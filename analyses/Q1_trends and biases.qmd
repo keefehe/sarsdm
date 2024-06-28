@@ -1,0 +1,3035 @@
+---
+title: "Figures for Q1: trends and biases in the SDM literature for SAR"
+author: Hannah Keefe
+format: docx
+editor: visual
+---
+
+# **Q1: What are the trends and taxonomic biases in the existing SDM literature for Canadian SAR?**
+
+## Trends and biases being explored:
+
+-   trends in across time
+
+-   trends by taxonomic group - e.g., proportion of species modelled, number of papers
+
+-   trends by risk status
+
+-   research effort
+
+-   representation of subspecies
+
+-   geographic scope - full vs partial range, countries included (CC-SDMs only)
+
+-   paper objectives (CC-SDMs only)
+
+## Some notes on methods:
+
+-   [**Unique species are defined by their scientific name in the below figures**]{.underline}**.** This means that we are combining populations listed under the same species name.
+
+-   [**A SDM paper (SDM)**]{.underline} is defined as a paper that includes a SDM that modelled at least one of the CANSAR species. This includes papers that used SDMs to model or project current, past and future distributions. This also includes papers that used climate (temperature and precipitation), climate + non-climatic, and only non-climatic predictors in their models, unless stated otherwise. Climate predictors include those related to temperature and precipitation. Non-climatic predictors include variables such as land-use, human density, soil, and elevation.
+
+-   [**A climate change SDM paper (CC-SDM)**]{.underline} is a subset of the SDMs that used an model trained using current or historical data to project future distributions, using climate projections. Thus, these papers must have at least one climatic predictor (i.e., either climate only or climate + non-climatic)
+
+-   [**Resource selection functions (RSFs)**]{.underline} obtained during the literature review are **excluded** from the below data exploration.
+
+-   Papers that [**did not include some or all of North America**]{.underline} in their geographic scope have been **excluded** from the below data exploration.
+
+-   [**Papers that were published in 2023**]{.underline} have been **excluded** from the below data exploration. This is because the searches on Web of Science were conducted periodically throughout 2023 and 2024, and therefore there would be inconsistencies in whether all 2023 papers were captured for all searches.
+
+-   Unless stated otherwise, the below data exploration is [**only including papers that modelled the exact species**]{.underline} listed in the CAN-SAR database.
+
+-   [**Birds**]{.underline} will be **excluded from analyses that explore research effort**, since only a partial literature review was completed for these species.
+
+-   [**DFO species**]{.underline} (i.e., species listed under Department of Fisheries and Oceans jurisdiction) and associated papers are **excluded** from the below data exploration since these species were not included in the literature review, and any papers obtained that modelled these species were only collected opportunistically.
+
+## 0) Prep
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+#load libraries
+
+library(tidyverse)
+library(ggplot2)
+library(viridis)
+library(cowplot)
+library(readxl)
+library(dplyr)
+library(ggbreak)
+
+setwd("~/projects/sarsdm")
+path = getwd()
+path
+```
+
+```{r}
+
+# load SAR-SDM paper database
+# this df holds data extracted from papers obtained in the literature review
+
+paper_db <- read.csv(paste0(path,"/data/SAR-SDM_paper_database_clean.csv"))
+
+# load SAR-SDM database
+# will be where we summarize some data found in the literature review
+
+sar_sdm <- read.csv(paste0(path,"/data/raw-data/SAR-SDM_database.csv"))
+
+#remove DFO species
+
+paper_db <- paper_db %>% filter (DFO=="0")
+
+# get list of taxa
+
+taxa <- unique(paper_db$taxonomic_group)
+
+#check that both databases have the same number of species and speciesID
+
+stopifnot(length(unique(sar_sdm$species)) == length(unique(paper_db$species)))
+
+stopifnot(length(unique(sar_sdm$speciesID)) == length(unique(paper_db$speciesID)))
+
+# remove papers with remove = 1 (found at Order level searches only, or during inconsistent searches)
+
+remove <- paper_db [which(paper_db$remove=="1"),]
+
+paper_db <- subset(paper_db, remove=="0" | remove=="2" | remove=="3" | is.na(remove))
+```
+
+## 1) General overview
+
+```{r}
+# get the total number of species 
+
+tot_sp <- length(unique(sar_sdm$species)) #should be 442
+
+# get the total number of taxa
+
+num_taxa <- length(unique(sar_sdm$taxonomic_group))
+
+```
+
+There is a total of `r tot_sp` terrestrial species listed as at risk under Schedule 1 of SARA as of March 23, 2021 (i.e., included in CAN-SAR).
+
+There are `r num_taxa` terrestrial taxonomic groups (Arthropods, Amphibians, Mammals, Reptiles, Mosses, Lichen, Molluscs, Vascular Plants, and Birds).
+
+**Summary of all papers found in literature review, and species represented**
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+# get the total number of unique papers
+
+tot_paper <- length(unique(paper_db$paperID))-1 # -1 to get rid of paperID 0
+
+# get number of RSF papers and species
+
+rsf <- paper_db[which(paper_db$rsf=="1"),]
+num_rsf_paper <- length(unique(rsf$paperID))
+num_rsf_sp <- length(unique(rsf$species))
+
+# get number of notNA papers and species
+
+notNA <- paper_db[which(paper_db$North_America=="0"),]
+num_notNA_paper <- length(unique(notNA$paperID))
+num_notNA_sp <- length(unique(notNA$species))
+
+# get number of 2023 and 2024 papers and species 
+
+pub23_24 <- paper_db[which(paper_db$year_published=="2023"|paper_db$year_published=="2024"),]
+num_pub23_24_paper <- length(unique(pub23_24$paperID))
+num_pub23_24_sp <- length(unique(pub23_24$species))
+
+# get number of papers that model a related species, and the number of species
+
+not_exact_sp <- paper_db[which(paper_db$subspecies_model=="2"|paper_db$subspecies_model=="3"|paper_db$subspecies_model=="4"),]
+num_notexact_paper <- length(unique(not_exact_sp$paperID))
+num_notexact_sp <- length(unique(not_exact_sp$speciesID))
+```
+
+In total, `r tot_paper` papers were obtained during the literature review. This includes `r num_remove_paper` papers that will be removed for most of the analyses:
+
+-   use an RSF to model SAR (`r num_rsf_paper` unique papers, modelling `r num_rsf_sp` unique species) ;
+
+-   papers that do not include North America in their geographic scope (`r num_notNA_paper` unique papers, modelling `r num_notNA_sp` unique species) ;
+
+-   papers that were published in 2023 and 2024 (`r num_pub23_24_paper` unique papers, modelling `r num_pub23_24_sp` unique species) ;
+
+-   papers that do not model the exact species listed as at risk (e.g., model the parent species of a subspecies at risk) (`r num_notexact_paper` unique papers, modelling `r num_notexact_sp` unique species)
+
+**Summary of papers to be included in analyses, and species represented**
+
+```{r}
+# get subset of paper_db that only includes the sdm data we're interested in (see notes above)
+
+#paper_db_subset2 <- paper_db[which(paper_db$year!=2023),]
+#paper_db_subset2 <- paper_db_subset2[which(paper_db_subset2$rsf=="0"),]
+#paper_db_subset2 <- paper_db_subset2[which(paper_db_subset2$North_America=="1"),]
+#paper_db_subset2 <- paper_db_subset2[which(paper_db_subset2$subspecies_model=="0"|paper_db_subset2$subspecies_model=="1"),]
+
+sdm_paper_db <- paper_db %>%
+  filter (year_published != 2023, year_published != 2024, rsf == 0, North_America == 1, subspecies_model < 2)
+
+# get number of papers removed bc they do  not fit the criteria
+
+num_remove_paper <- tot_paper - length(unique(sdm_paper_db$paperID))
+
+# get number of papers and species with a SDM
+
+num_sdm_paper <- length(unique(sdm_paper_db$paperID))
+num_sdm_sp <- length(unique(sdm_paper_db$species))
+
+# get number of papers and species with a CC-SDM
+
+cc_sdm_paper_db <- sdm_paper_db[which(sdm_paper_db$proj_future=="1" & sdm_paper_db$predictors <= 2),]
+num_cc_sdm_paper <- length(unique(cc_sdm_paper_db$paperID))
+num_cc_sdm_sp <- length(unique(cc_sdm_paper_db$species))
+```
+
+A total of `r num_sdm_paper` unique papers will be included in the majority of the analyses. These papers model `r num_sdm_sp` unique species. Of these papers, `r num_cc_sdm_paper` are CC-SDMs, which model `r num_cc_sdm_sp`.
+
+```{r}
+# add columns to SAR-SDM database to indicate whether each species was included in an SDM or CC-SDM as per the above listed criteria
+
+# add data for SDM
+
+sar_sdm$sdm <- sar_sdm$species %in% sdm_paper_db$species
+
+# add data for CC-SDM
+
+sar_sdm$cc_sdm <- sar_sdm$species %in% cc_sdm_paper_db$species
+
+sar_sdm[sar_sdm == "TRUE"] <- "1"
+sar_sdm[sar_sdm == "FALSE"] <- "0"
+```
+
+```{r}
+rm(notNA, pub23_24, remove, rsf)
+```
+
+## 2) Trends across time
+
+```{r}
+
+# subsets of database without Stolar (in prep) included - can't be included here since there is no publication year
+
+sdm_data_noStolar <- sdm_paper_db[which(!(sdm_paper_db$paperID=="140")),]
+
+cc_sdm_data_noStolar <- cc_sdm_paper_db[which(!(cc_sdm_paper_db$paperID=="140")),]
+
+# get a list of years
+
+years<-min(sdm_data_noStolar$year_published):max(sdm_data_noStolar$year_published)
+
+# 1) Overall #================================
+
+sdmtype<-c("SDM","CC-SDM")
+
+fig1_2_db<-data.frame()
+
+for (type in sdmtype) {
+  
+  n<-data.frame()
+  
+  if (type=="CC-SDM") {db=cc_sdm_data_noStolar}
+  
+  if (type=="SDM") {db=sdm_data_noStolar}
+  
+  for (y in years){
+    
+    m <- data.frame(1)
+    m$year <- y
+    m$category <- type
+    df <- db[which(db$year_published==y),]
+    m$paper <- length(unique(df$paperID))
+    n <- bind_rows(n,m)
+  
+  }
+  
+  n$cumsum <- cumsum(n$paper)
+  fig1_2_db <- bind_rows(fig1_2_db,n)
+}
+
+write.csv(fig1_2_db,paste0(path,"/data/derived-data/q1/papers_v_year.csv"))
+
+rm(m, n, df, db)
+
+# 2) By taxa #==============================
+
+fig3_6_db <- data.frame()
+
+for (type in sdmtype){
+
+  for (g in taxa) {
+    
+    taxa_data <- data.frame()
+    
+    for (y in years) {
+      
+      if (type=="CC-SDM"){db = cc_sdm_data_noStolar}
+      else if (type=="SDM"){db = sdm_data_noStolar}
+      
+      data <- db %>% filter (taxonomic_group == g, year_published == y)
+      
+      temp <- data.frame(1)
+      temp$group <- g
+      temp$category <- type
+      temp$year <- y
+      temp$num.paper <- length(unique(data$paperID))
+      
+      taxa_data <- bind_rows(taxa_data, temp)
+    }
+    
+    taxa_data$cumulative <- cumsum(taxa_data$num.paper)
+    fig3_6_db <- bind_rows(fig3_6_db, taxa_data)
+    
+  }
+}
+
+write.csv(fig3_6_db,paste0(path,"/data/derived-data/q1/papers_v_year_taxa.csv"))
+
+rm(taxa_data, temp, data, db, years, y, type, g)
+```
+
+### Figure 1: Cumulative number of papers published across time
+
+```{r, echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, fig.cap="Cumulative number of all SDMs (yellow) and CC-SDM (purple) papers published across time. The SDM category includes both non-CC-SDMs and CC-SDMs, meaning that CC-SDMs are a subset of SDMs. This data excludes Stolar et al (in prep) since there isn't a publication date associated with the study. This data includes papers found that modelled Birds listed as at risk, but note that not all Bird species were targetted for searches and a search was not completed at the taxonomic group level for Birds. This means that the cumulative number of papers that include an SDM that modelled SAR is likely higher than presented.", fig.width=7, fig.height=5}
+
+fig1<-ggplot(fig1_2_db, aes(x=year, y=cumsum)) + 
+  geom_line(aes(colour=factor(category))) + 
+  geom_point(aes(colour = factor(category)))+
+  scale_fill_viridis_d()+
+  ylab("Cumulative number of papers")+
+  xlab("Year")+
+  labs(color=NULL)+
+  theme(legend.position = 3,5)
+
+fig1+scale_colour_viridis_d()+theme_classic()
+
+rm (fig1)
+```
+
+### Figure 2: Number of papers published each year
+
+```{r, echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, fig.height=5, fig.width=7, fig.cap="The number of all SDM (yellow) and CC-SDM (purple) papers published each year. The SDM category includes both non-CC-SDMs and CC-SDMs, meaning that CC-SDMs are a subset of SDMs. This data excludes Stolar et al (in prep) since there isn't a publication date associated with the study. This data includes papers found that modelled Birds listed as at risk, but note that not all Bird species were targetted for searches and a search was not completed at the taxonomic group level for Birds. This means that the number of papers published that include an SDM that modelled SAR is likely higher than presented."}
+
+fig2<-ggplot(fig1_2_db, aes(x=year, y=paper)) + 
+  #ggtitle("Cumulative number of SDMs across publication year")+
+  geom_line(aes(colour=factor(category))) + 
+  geom_point(aes(colour = factor(category)))+
+  scale_fill_viridis_d()+
+  ylab("Number of papers published")+
+  xlab("Year")+
+  labs(color=NULL)+
+  theme(legend.position = 3,5)
+
+fig2+scale_colour_viridis_d()+theme_classic()
+
+rm(fig1, fig2, fig1_2_db)
+
+```
+
+### Figure 3: Cumulative number of SDM papers published across time by taxa
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.cap="The cumulative number of SDM papers (all) published each year, separated by taxonomic group. Year is the year that the paper was published. Some papers model species across taxa, thus the sum of the cumulative number of papers across taxa will be greater than the number of papers obtained in the literature search. This data excludes Stolar et al. (in prep) as there isn't a publication date associated with that study. This data excludes Birds, since only a partial search was completed for this group.",fig.width=7, fig.height=5}
+
+fig3_db <- fig3_6_db %>% 
+  filter (category=="SDM", group != "Birds")  
+fig3<-ggplot(fig3_db, aes(x=year, y=cumulative)) +    
+  #ggtitle("Cumulative number of SDMs across publication year")+   
+  geom_line(aes(colour=factor(group))) +    
+  geom_point(aes(colour = factor(group)))+   
+  scale_fill_viridis_d()+   ylab("Cumulative number of SDM papers")+   
+  xlab("Year")+   
+  ylim(0,50)+   
+  labs(color=NULL)+   
+  theme(legend.position = 3,5)  
+
+fig3+scale_colour_viridis_d()+theme_classic()  
+
+rm(fig3_db, fig3)
+```
+
+### Figure 4: Cumulative number of CC-SDMs published across time by taxa
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, error=FALSE, fig.cap="The cumulative number of CC-SDM papers published each year, separated by taxonomic group. Year is the year that the paper was published. Some papers model species across taxa, thus the sum of the cumulative number of papers across taxa will be greater than the number of papers obtained in the literature search. This data includes species that were targeted during the Web of Science searches completed before Dec 2023 (n=287). This data excludes Stolar et al. (in prep) as there isn't a publication date associated with that study.", fig.width=7, fig.height=5}
+
+fig4_db <- fig3_6_db %>% 
+  filter (category == "CC-SDM", group != "Birds")  
+fig4<-ggplot(fig4_db, aes(x=year, y=cumulative)) +    
+  #ggtitle("Cumulative number of CC-SDMs across publication year")+   
+  geom_line(aes(colour=factor(group))) +    
+  geom_point(aes(colour = factor(group)))+   
+  scale_fill_viridis_d()+   
+  ylab("Cumulative number of CC-SDM papers")+   
+  xlab("Year")+   ylim(0,50)+   labs(color=NULL)+   
+  theme(legend.position="none")  
+
+fig4+scale_colour_viridis_d()+theme_classic()  
+
+rm(fig4_db, fig4)
+```
+
+### Figure 5: Number of SDM papers published each year by taxa
+
+```{r, echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, fig.height=5, fig.width=7, fig.cap="Number of SDM published each year separated by taxa. Year is the year that the paper was published. Some papers model species across taxa, thus the sum of the number of papers will be greater than the total number of papers obtained during the literature search. This data includes species targeted in the Web of Science searches completed before Dec 2023 (n=287). This data excludes Stolar et al (in prep) since that study does not have a publication date yet."}
+fig5_db <- fig3_6_db %>% 
+  filter (category == "SDM", group !="Birds")  
+fig5 <- ggplot(fig5_db, aes(x=year, y=num.paper)) +    
+  geom_line(aes(colour=factor(group))) +    
+  geom_point(aes(colour = factor(group)))+   
+  scale_fill_viridis_d()+   
+  ylab("Number of SDM papers published")+   
+  xlab("Year")+   
+  labs(color=NULL)+   
+  ylim(0,8)+   
+  theme(legend.position="none")  
+
+fig5+scale_colour_viridis_d()+theme_classic()  
+
+rm(fig5_db, fig5)
+```
+
+### Figure 6: Number of CC-SDM papers published each year by taxa
+
+```{r, echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, fig.height=5, fig.width=7, fig.cap="Number of CC-SDM published each year separated by taxa. Year is the year that the paper was published. Some papers model species across taxa, thus the sum of the number of papers will be greater than the total number of papers obtained during the literature search. This data includes species targeted in the Web of Science searches completed before Dec 2023 (n=287). This data excludes Stolar et al (in prep) since that study does not have a publication date yet."}
+fig6_db <- fig3_6_db %>% 
+  filter (category == "CC-SDM", group !="Birds")  
+
+fig6<-ggplot(fig6_db, aes(x=year, y=num.paper)) +    
+  geom_line(aes(colour=factor(group))) +    
+  geom_point(aes(colour = factor(group)))+   
+  scale_fill_viridis_d()+   
+  ylab("Number of papers published")+   
+  xlab("Year")+   labs(color=NULL)+   
+  ylim (0,8)+   
+  theme(legend.position="none")  
+
+fig6+scale_colour_viridis_d()+theme_classic()  
+
+rm(fig6_db, fig6, fig3_6_db)
+```
+
+## 3) Number of species included in each paper
+
+```{r}
+# NOTE: excluding Stolar since we don't know the total number of species modelled
+
+# 1) Summary statistics #=======================================
+
+# figure with intervals of number of species modelled on x axis and number of papers that modelled that many species on the y axis
+
+sdm_data_noStolar$num_species <- sapply(sdm_data_noStolar$num_species, as.numeric)
+cc_sdm_data_noStolar$num_species <- sapply(cc_sdm_data_noStolar$num_species, as.numeric)
+
+columns <- c("sdmtype", "value", "sp.group", "data")
+stat_db = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(stat_db) = columns
+
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+# get min, max, mean and median number of all species (CAN-SAR or not) modelled in each paper
+
+for (type in sdmtype){
+  
+  if (type=="SDM"){db=sdm_data_noStolar}
+  else if (type=="CC-SDM"){db=cc_sdm_data_noStolar}
+  
+  num_sp <- db %>%
+    select (paperID, num_species)
+  
+  num_sp <- unique(num_sp)
+  names(num_sp) <- c("paperID","num_species")
+  write.csv (num_sp, paste0(path,"/data/derived-data/q1/num_sp_per_paper_",type,".csv"))
+  
+  num_sp <- sort(num_sp$num_species)
+  
+  # add row with min value
+  stat_db[nrow(stat_db) + 1,] = c(type, "min", "All species", min(num_sp))
+  
+  # add row with max value
+  stat_db[nrow(stat_db) + 1,] = c(type, "max", "All species", max(num_sp))
+  
+  # add row with mean
+  stat_db[nrow(stat_db) + 1,] = c(type, "mean", "All species", mean(num_sp))
+  
+  # add row with median
+  stat_db[nrow(stat_db) + 1,] = c(type, "median", "All species", median(num_sp))
+  
+  # add row with mode
+  stat_db[nrow(stat_db) + 1,] = c(type, "mode", "All species", Mode(num_sp))
+  
+}
+
+# create dataframe that lists the papers, and how many SAR were included
+# then, get min, max, mean and median number of CAN-SAR species modelled in each paper
+
+columns = c("paperID","num_species") 
+sar_per_paper = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(sar_per_paper) = columns
+
+for (type in sdmtype){
+  
+  if (type=="SDM"){db=sdm_data_noStolar}
+  
+  else if (type=="CC-SDM"){db=cc_sdm_data_noStolar}
+  
+  for (ID in db$paperID) { #first, get the number of SAR modelled in each paper
+  
+    sar_sp_data <- db %>% 
+      filter (paperID == ID) %>%
+      select (species, paperID)
+    
+    sar_per_paper[nrow(sar_per_paper) + 1,] = c(ID,length(unique(sar_sp_data$species)))
+    
+  }
+  
+  sar_per_paper <- unique(sar_per_paper) #only keep unique paperID-number of SAR
+  write.csv(sar_per_paper, paste0(path,"/data/derived-data/q1/num_sar_per_paper_",type,".csv"))
+
+  num_sp <- sort(sar_per_paper$num_species)
+  
+  # add row with min value
+  stat_db[nrow(stat_db) + 1,] = c(type, "min", "CAN-SAR", min(num_sp))
+  
+  # add row with max value
+  stat_db[nrow(stat_db) + 1,] = c(type, "max", "CAN_SAR", max(num_sp))
+  
+  # add row with mean
+  stat_db[nrow(stat_db) + 1,] = c(type, "mean", "CAN_SAR", mean(num_sp))
+  
+  # add row with median
+  stat_db[nrow(stat_db) + 1,] = c(type, "median", "CAN_SAR", median(num_sp))
+  
+  # add row with mode
+  stat_db[nrow(stat_db) + 1,] = c(type, "mode", "CAN-SAR", Mode(num_sp))
+  
+}
+
+write.csv(stat_db, paste0(path, "/data/derived-data/q1/num_sp_per_paper_stats.csv"))
+
+rm(num_sp, columns, sar_per_paper, db, sar_sp_data, type, ID, Mode)
+
+
+
+# 2) Data for overall figures #===============================================
+
+# goals: histogram number of species (x) vs number of papers (y)
+
+columns <- c("sdmtype", "sp.group", "num.sp","num.paper")
+fig7_10_db = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(fig7_10_db) = columns
+
+num_sp_list <- read.csv(paste0(path,"/data/derived-data/q1/num_sp_per_paper_SDM.csv"))
+num_sp_list <- min(num_sp_list$num_species):max(num_sp_list$num_species)
+
+sp_categories <- c("Any species", "CAN-SAR species")
+
+for (type in sdmtype){
+  
+  for (cat in sp_categories){
+    
+    if (cat == "Any species" & type == "SDM"){
+      db<-read.csv(paste0(path,"/data/derived-data/q1/num_sp_per_paper_SDM.csv"))
+    }
+    else if (cat == "CAN-SAR species" & type == "SDM"){
+      db<-read.csv(paste0(path,"/data/derived-data/q1/num_sar_per_paper_SDM.csv"))
+    }
+    else if (cat == "Any species" & type == "CC-SDM"){
+      db<-read.csv(paste0(path,"/data/derived-data/q1/num_sp_per_paper_CC-SDM.csv"))
+    }
+    else if (cat == "CAN-SAR species" & type == "CC-SDM"){
+      db<-read.csv(paste0(path,"/data/derived-data/q1/num_sar_per_paper_CC-SDM.csv"))
+    }
+    
+    for (num in num_sp_list){
+      
+      temp <- db %>% 
+        filter (num_species==num)
+      
+      if (nrow(temp)==0){}
+      
+      else {
+      
+      fig7_10_db[nrow(fig7_10_db) + 1,] = c(type, cat, num, length(unique(temp$paperID)))
+      }
+      
+    }
+      
+  }
+    
+}
+
+rm(type, cat, num, num_sp_list, sp_categories, temp, db)
+```
+
+**Summary stats for number of species (CAN-SAR +other) included in a SDM paper:**
+
+```{r}
+mean_sp <- stat_db %>% filter (sdmtype=="SDM",sp.group=="All species", value=="mean")
+
+median_sp <- stat_db %>% filter (sdmtype=="SDM",sp.group=="All species", value=="median")
+
+mode_sp <- stat_db %>% filter (sdmtype=="SDM",sp.group=="All species", value=="mode")
+
+min_sp <- stat_db %>% filter (sdmtype=="SDM",sp.group=="All species", value=="min")
+
+max_sp <- stat_db %>% filter (sdmtype=="SDM", sp.group=="All species", value=="max")
+```
+
+-   range: `r min_sp` - `r max_sp`.
+
+```{=html}
+<!-- -->
+```
+-   mean: `r mean_sp`
+
+-   mode: `r mode_sp`
+
+-   median: `r median_sp`
+
+**Summary stats for number of species (CAN-SAR + other) included in a CC-SDM paper:**
+
+```{r}
+mean_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="All species", value=="mean")
+
+median_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="All species", value=="median")
+
+mode_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="All species", value=="mode")
+
+min_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="All species", value=="min")
+
+max_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="All species", value=="max")
+```
+
+-   range: `r min_sp` - `r max_sp`.
+
+```{=html}
+<!-- -->
+```
+-   mean: `r mean_sp`
+
+-   mode: `r mode_sp`
+
+-   median: `r median_sp`
+
+**Summary stats for number of CAN-SAR species included in a SDM paper:**
+
+```{r}
+mean_sp <- stat_db %>% filter (sdmtype=="SDM", sp.group=="CAN-SAR", value=="mean")
+
+median_sp <- stat_db %>% filter (sdmtype=="SDM", sp.group=="CAN-SAR", value=="median")
+
+mode_sp <- stat_db %>% filter (sdmtype=="SDM", sp.group=="CAN-SAR", value=="mode")
+
+min_sp <- stat_db %>% filter (sdmtype=="SDM", sp.group=="CAN-SAR", value=="min")
+
+max_sp <- stat_db %>% filter (sdmtype=="SDM", sp.group=="CAN-SAR", value=="max")
+
+```
+
+-   range: `r min_sp` - `r max_sp`.
+
+```{=html}
+<!-- -->
+```
+-   mean: `r mean_sp`
+
+-   mode: `r mode_sp`
+
+-   median: `r median_sp`
+
+**Summary stats for number of CAN-SAR species included in a CC-SDM paper:**
+
+```{r}
+mean_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="CAN-SAR", value=="mean")
+
+median_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="CAN-SAR", value=="median")
+
+mode_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="CAN-SAR", value=="mode")
+
+min_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="CAN-SAR", value=="min")
+
+max_sp <- stat_db %>% filter (sdmtype=="CC-SDM", sp.group=="CAN-SAR", value=="max")
+```
+
+-   range: `r min_sp` - `r max_sp`.
+
+```{=html}
+<!-- -->
+```
+-   mean: `r mean_sp`
+
+-   mode: `r mode_sp`
+
+-   median: `r median_sp`
+
+```{r}
+rm(median_sp, mean_sp, mode_sp, min_sp, max_sp, stat_db)
+```
+
+### Figure 7: Distribution of number of species included in SDM papers
+
+```{r, echo=FALSE, message=FALSE,error=FALSE,warning=FALSE,fig.height=5,fig.width=7,fig.cap="Histogram showing the number of SDM papers that modelled different numbers of unique species. SDM papers include include CC-SDMs and all other SDMs. The number of species represented in this figure represent all species included in the paper, which includes CAN-SAR species and other species. This figure does not include Stolar (in prep) because we don't know how many species were modelled total. "}
+
+fig7_db <- fig7_10_db %>%
+  filter(sp.group=="Any species", sdmtype=="SDM")
+
+fig7_db$num.sp <- sapply(fig7_db$num.sp, as.numeric)
+
+fig7_db$num.sp <- factor(fig7_db$num.sp, levels = levels(factor(fig7_db$num.sp)), ordered = TRUE )
+
+fig7<-ggplot(fig7_db, aes(y=num.paper, x=num.sp, fill=sdmtype)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=num.paper), position=position_dodge(width=0.9), vjust=-0.25, size=2)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of SDM papers")+
+  xlab("Number of unique species (CAN-SAR + other) modelled")+
+  #ylim(0,200)+
+  theme (axis.text.x=element_text(angle=90,size=10,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+fig7
+
+rm(fig7, fig7_db)
+```
+
+### Figure 8: Distribution of number of species included in CC-SDM papers
+
+```{r, "Histogram showing the number of CC-SDM papers that modelled different numbers of unique species. CC-SDMs are a subset of all SDM papers (shown in previous figure). The number of species represented in this figure represent all species included in the paper, which includes CAN-SAR species and other species. This figure does not include Stolar (in prep) because we don't know how many species were modelled total. "}
+
+fig8_db <- fig7_10_db %>%
+  filter(sp.group=="Any species", sdmtype=="CC-SDM")
+
+fig8_db$num.sp <- sapply(fig8_db$num.sp, as.numeric)
+
+fig8_db$num.sp <- factor(fig8_db$num.sp, levels = levels(factor(fig8_db$num.sp)), ordered = TRUE )
+
+fig8<-ggplot(fig8_db, aes(y=num.paper, x=num.sp, fill=sdmtype)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=num.paper), position=position_dodge(width=0.9), vjust=-0.25, size=2)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of CC-SDM papers including X species")+
+  xlab("Number of unique species (CAN-SAR + other) modelled")+
+  #ylim(0,200)+
+  theme (axis.text.x=element_text(angle=90,size=10,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+fig8
+
+rm(fig8, fig8_db)
+```
+
+### Figure 9: Number of CAN-SAR species included in SDM papers
+
+```{r}
+
+fig9_db <- fig7_10_db %>%
+  filter(sp.group=="CAN-SAR species", sdmtype=="SDM")
+
+fig9_db$num.sp <- sapply(fig9_db$num.sp, as.numeric)
+
+fig9_db$num.sp <- factor(fig9_db$num.sp, levels = levels(factor(fig9_db$num.sp)), ordered = TRUE )
+
+fig9<-ggplot(fig9_db, aes(y=num.paper, x=num.sp, fill=sdmtype)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=num.paper), position=position_dodge(width=0.9), vjust=-0.25, size=2)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of SDM papers including X species")+
+  xlab("Number of unique CAN-SAR species modelled")+
+  #ylim(0,200)+
+  theme (axis.text.x=element_text(angle=90,size=10,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+fig9
+
+rm(fig9, fig9_db)
+```
+
+### Figure 10: Number of CAN-SAR species included in CC-SDM papers
+
+```{r}
+
+fig10_db <- fig7_10_db %>%
+  filter(sp.group=="CAN-SAR species", sdmtype=="CC-SDM")
+
+fig10_db$num.sp <- sapply(fig10_db$num.sp, as.numeric)
+
+fig10_db$num.sp <- factor(fig10_db$num.sp, levels = levels(factor(fig10_db$num.sp)), ordered = TRUE )
+
+fig10<-ggplot(fig10_db, aes(y=num.paper, x=num.sp, fill=sdmtype)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=num.paper), position=position_dodge(width=0.9), vjust=-0.25, size=2)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of CC-SDM papers including X species")+
+  xlab("Number of unique CAN-SAR species modelled")+
+  #ylim(0,200)+
+  theme (axis.text.x=element_text(angle=90,size=10,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+fig10
+
+rm(fig10, fig10_db, fig7_10_db)
+
+```
+
+## 4) Taxonomic group representation
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Code for all figures in this section
+
+# 1) number and proportion of species #=========================
+
+categories<-c("Total in taxonomic group","Included in a CC-SDM","Included in a SDM")
+
+fig11_12_db<-data.frame()
+
+for (cat in categories) {
+  
+  if (cat=="Total in taxonomic group") {db = sar_sdm}
+  else if (cat=="Included in a CC-SDM") {db = cc_sdm_paper_db}
+  else if (cat == "Included in a SDM") {db = sdm_paper_db} 
+  
+  for (g in taxa){
+    
+    n <- data.frame(1)
+    sh <- db[which(db$taxonomic_group==g),] #isolate taxonomic group
+    n$data.type <- c("Number")
+    n$category <- cat
+    n$group <- g
+    n$species <- length(unique(sh$species)) #number of species
+    fig11_12_db <- bind_rows(fig11_12_db,n)
+    
+  }
+}
+
+categories<-c("Total in taxonomic group","Included in a CC-SDM","Included in a SDM", "Not included in a SDM")
+
+for (g in taxa){
+  
+  tot <- fig11_12_db %>% filter (category=="Total in taxonomic group" & group==g)
+  sp_sdm <- fig11_12_db %>% filter (category=="Included in a SDM" & group==g)
+  sp_cc_sdm <- fig11_12_db %>% filter (category=="Included in a CC-SDM" & group==g)
+  sp_no_sdm <- tot$species - sp_sdm$species
+  
+  stopifnot(tot$species == (sp_sdm$species + sp_no_sdm))
+  stopifnot(sp_cc_sdm$species <= sp_sdm$species)
+  
+  for (cat in categories){
+    
+    temp <- data.frame(1)
+    temp$data.type <- c("Proportion")
+    temp$category <- cat
+    temp$group <- g
+    
+    if (cat=="Total in taxonomic group"){
+      temp$species <- tot$species / tot$species
+    }
+    
+    else if (cat=="Included in a CC-SDM"){
+      temp$species <- sp_cc_sdm$species / tot$species
+      }
+    
+    else if (cat=="Included in a SDM"){
+      temp$species <- sp_sdm$species / tot$species
+      }
+    
+    else if (cat=="Not included in a SDM"){
+      temp$species <- (tot$species - sp_sdm$species) / tot$species
+      }
+    
+    fig11_12_db <- bind_rows(fig11_12_db, temp)
+    
+  }
+  
+}
+
+write.csv(fig11_12_db, paste0(path,"/data/derived-data/q1/taxa_breakdown_num_prop.csv"))
+
+rm(temp, n, sh, tot, sp_sdm, sp_cc_sdm, sp_no_sdm, db, categories, cat)
+```
+
+### Figure 11: Number of SAR modelled, by taxa
+
+```{r, fig.cap="Figure 4. Total number of unique species in the group (yellow), included in an SDM (green) and included in a CC-SDM (purple), separated by taxa. The SDM category includes both non-CC-SDMs and CC-SDMs, meaning that CC-SDMs are a subset of SDMs.", fig.width=7, fig.height=5}
+
+fig11_db <- fig11_12_db %>% filter (data.type=="Number")
+
+fig11_db$levels <- factor(fig11_db$category, levels = c('Total in taxonomic group', 'Included in a SDM','Included in a CC-SDM'))
+
+fig11<-ggplot(fig11_db, aes(y=species, x=group, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=species), position=position_dodge(width=0.9), vjust=-0.25, size=2)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of species")+
+  xlab(element_blank())+
+  ylim(0,200)+
+  theme (axis.text.x=element_text(angle=90,size=10,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+
+fig11
+
+rm(fig11, fig11_db) 
+```
+
+### Figure 12: Proportion of SAR, by taxa
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE,fig.cap="Figure 5. Proportion of unique species included in a CC-SDM (purple), included in an SDM (green), or not included in any SDM (yellow) separated by taxa. Proportion = # of species in group with CC-SDM or SDM or no SDM/total species in group. This data includes all terrestrial species targeted in Web of Science searches before December 2023 (n=287). This data excludes Stolar et al. (in prep).",fig.height=5,fig.width=7}
+
+fig12_db <- fig11_12_db %>% filter (data.type=="Proportion", category != "Total in taxonomic group")
+
+fig12_db$levels <- factor(fig12_db$category, levels = c('Included in a SDM','Included in a CC-SDM','Not included in a SDM'))
+
+fig12_db$species <- round(fig12_db$species, digits=2)
+
+fig12<-ggplot(fig12_db, aes(y=species, x=group, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=species), position=position_dodge(width=0.9), vjust=-0.25,size=2)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Proportion of species in group")+
+  xlab(element_blank())+
+  theme (axis.text.x=element_text(angle=90,size=11,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+
+fig12
+
+rm(fig12_db, fig12, fig11_12_db)
+```
+
+## 5) Research Effort
+
+```{r}
+
+# includes Stolar, excludes Birds
+
+# 1) Species breakdown of research effort #===============================
+
+columns <- c("sdmtype","species", "taxa", "num.papers")
+re_sp = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(re_sp) = columns
+
+species <- unique(sar_sdm$species)
+
+for (sp in species){
+  
+  tg <- sar_sdm %>%
+    filter (species==sp)
+  tg <- tg$taxonomic_group[1]
+  
+  for (type in sdmtype){
+    
+    if (type=="SDM"){db <- sdm_paper_db}
+    else if (type=="CC-SDM"){db <- cc_sdm_paper_db}
+    
+    sp_data <- db %>%
+      filter (species==sp) %>%
+      select (species, paperID, taxonomic_group)
+    
+    sp_data <- unique(sp_data)
+    
+    re_sp[nrow(re_sp) + 1,] = c(type, sp, tg, length(unique(sp_data$paperID)))
+  }
+}
+
+stopifnot(nrow(re_sp) == (2*tot_sp))
+
+write.csv (re_sp, paste0(path,"/data/derived-data/q1/research_effort_by_sp.csv"))
+
+re_sp <- re_sp %>%
+  filter (taxa != "Birds")
+
+rm(db, columns, sp_data, tg, species, columns)
+
+# 2) Taxa breakdown of research effort #==================================
+
+columns <- c("sdmtype","taxa", "num.papers")
+re_taxa = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(re_taxa) = columns
+
+for (t in taxa){
+  
+  for (type in sdmtype){
+    
+    if (type=="SDM"){db <- sdm_paper_db}
+    else if (type=="CC-SDM"){db <- cc_sdm_paper_db}
+    
+    tx_data <- db %>%
+      filter (taxonomic_group==t) %>%
+      select (taxonomic_group, paperID)
+    tx_data <- unique(tx_data)
+    
+    re_taxa[nrow(re_taxa) + 1,] = c(type, t, length(unique(tx_data$paperID)))
+  }
+}
+
+stopifnot(nrow(re_taxa) == (2*length(taxa)))
+
+write.csv (re_taxa, paste0(path,"/data/derived-data/q1/research_effort_by_taxa.csv"))
+
+re_taxa <- re_taxa %>%
+  filter (taxa != "Birds")
+
+rm(tx_data, columns, db)
+
+# 3) Summary stats #============================================================
+
+re_sp$num.papers <- sapply(re_sp$num.papers, as.numeric)
+re_taxa$num.papers <- sapply(re_taxa$num.papers, as.numeric)
+
+columns <- c("sdmtype", "group","stat", "value")
+stat_db = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(stat_db) = columns
+
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+for (type in sdmtype){
+  
+  # first summary stats across all species
+  
+  if (type=="SDM"){
+    db <- re_sp %>% 
+      filter (sdmtype=="SDM")
+    }
+  else if (type=="CC-SDM"){
+    db <- re_sp %>% 
+      filter (sdmtype=="CC-SDM")
+    }
+  
+  # add row with min value
+  stat_db[nrow(stat_db) + 1,] = c(type, "Species", "min", min(db$num.papers))
+  
+  # add row with max value
+  stat_db[nrow(stat_db) + 1,] = c(type, "Species", "max", max(db$num.papers))
+  
+  # add row with mean
+  stat_db[nrow(stat_db) + 1,] = c(type, "Species", "mean", mean(db$num.papers))
+  
+  # add row with median
+  stat_db[nrow(stat_db) + 1,] = c(type, "Species", "median", median(db$num.papers))
+  
+  # add row with mode
+  stat_db[nrow(stat_db) + 1,] = c(type, "Species", "mode", Mode(db$num.papers))
+  
+  # next, summary stats comparing taxonomic groups
+  
+  if (type=="SDM"){
+    db <- re_taxa %>% 
+      filter (sdmtype=="SDM")
+    }
+  else if (type=="CC-SDM"){
+    db <- re_taxa %>% 
+      filter (sdmtype== "CC-SDM")
+  }
+  
+    # add row with min value
+    stat_db[nrow(stat_db) + 1,] = c(type, "Taxa", "min", min(db$num.papers))
+    
+    # add row with max value
+    stat_db[nrow(stat_db) + 1,] = c(type, "Taxa", "max", max(db$num.papers))
+    
+    # add row with mean
+    stat_db[nrow(stat_db) + 1,] = c(type, "Taxa", "mean", mean(db$num.papers))
+    
+    # add row with median
+    stat_db[nrow(stat_db) + 1,] = c(type, "Taxa", "median", median(db$num.papers))
+    
+    # add row with mode
+    stat_db[nrow(stat_db) + 1,] = c(type, "Taxa", "mode", Mode(db$num.papers))
+  
+  
+    #last, summary statistics within taxonomic groups
+    
+    for (t in taxa){
+   
+      if (type=="SDM"){
+      db <- re_sp %>% 
+        filter (sdmtype =="SDM", taxa == t)
+      }
+      
+      else if (type=="CC-SDM"){
+      db <- re_sp %>% 
+        filter (sdmtype=="CC-SDM", taxa == t)
+      }
+      
+      # add row with min value
+      stat_db[nrow(stat_db) + 1,] = c(type, t, "min", min(db$num.papers))
+      
+      # add row with max value
+      stat_db[nrow(stat_db) + 1,] = c(type, t, "max", max(db$num.papers))
+      
+      # add row with mean
+      stat_db[nrow(stat_db) + 1,] = c(type, t, "mean", mean(db$num.papers))
+      
+      # add row with median
+      stat_db[nrow(stat_db) + 1,] = c(type, t, "median", median(db$num.papers))
+      
+      # add row with mode
+      stat_db[nrow(stat_db) + 1,] = c(type, t, "mode", Mode(db$num.papers))
+    
+  }
+  
+}
+
+stat_db <- stat_db %>%
+  filter (group != "Birds")
+
+rm(db, Mode, columns)
+
+# 4) Top modelled species #===============================================
+
+top_sdm <- re_sp %>%
+  filter (sdmtype=="SDM") %>%
+  arrange(desc(num.papers)) %>%
+  slice(1:12) %>%
+  select (species, taxa, num.papers)
+
+top_cc <- re_sp %>%
+  filter (sdmtype=="CC-SDM") %>%
+  arrange(desc(num.papers)) %>%
+  slice(1:12) %>%
+  select (species, taxa, num.papers)
+
+# 5) Number of papers vs number of species
+
+columns <- c("sdmtype", "num.papers","num.species", "taxa")
+fig15_16_db = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(fig15_16_db) = columns
+
+for (type in sdmtype){
+  
+  for (t in taxa) {
+  
+  if (type=="SDM"){
+    db <- re_sp %>% 
+      filter (sdmtype=="SDM", taxa==t)
+    }
+  else if (type=="CC-SDM") {
+    db <- re_sp %>% 
+      filter (sdmtype=="CC-SDM", taxa==t)
+    }
+    
+    num_papers_list <- unique(db$num.papers)
+    
+    for (num in num_papers_list){
+      
+      num_data <- db %>% filter (num.papers==num)
+      
+      fig15_16_db[nrow(fig15_16_db) + 1,] = c(type, num, length(unique(num_data$species)), t)
+      
+    }
+  }
+}
+
+rm(db, num_papers_list, num_data, columns)
+
+fig15_16_db$num.papers <- sapply(fig15_16_db$num.papers, as.numeric)
+fig15_16_db$num.species <- sapply(fig15_16_db$num.species, as.numeric)
+
+# 6) Number of papers per taxa #===========================================
+
+columns <- c("sdmtype", "taxa","num.papers")
+fig17_db = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(fig17_db) = columns
+
+for (type in sdmtype){
+  
+  for (t in taxa){
+    
+    if (type=="SDM"){
+      db <- sdm_paper_db %>% 
+        filter (taxonomic_group==t)
+    }
+    else if (type=="CC-SDM"){
+      db <- cc_sdm_paper_db %>% 
+        filter (taxonomic_group==t)
+    }
+    
+    fig17_db[nrow(fig17_db) + 1,] = c(type, t, length(unique(db$paperID)))
+    
+  }
+}
+
+fig17_db <- fig17_db %>% filter (taxa != "Birds")
+fig17_db$num.papers <- sapply(fig17_db$num.papers, as.numeric)
+
+rm(db, columns)
+
+# 7) Mean number of papers / species by taxa #==============================
+
+columns <- c("sdmtype", "taxa","mean.paper.p.sp")
+fig18_db = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(fig18_db) = columns
+
+for (type in sdmtype){
+  for (t in taxa){
+    
+    db <- re_sp %>% filter (sdmtype==type, taxa==t)
+    
+    fig18_db[nrow(fig18_db) + 1,] = c(type, t, mean(db$num.papers))
+    
+  }
+}
+
+fig18_db <- fig18_db %>% filter (taxa != "Birds")
+fig18_db$mean.paper.p.sp <- sapply(fig18_db$mean.paper.p.sp, as.numeric)
+
+rm(db, type, t, column)
+
+rm(re_taxa, stat_db)
+```
+
+**Top modelled species (SDM)**
+
+```{r}
+top_sdm
+
+rm(top_sdm)
+```
+
+**Top modelled species (CC-SDM)**
+
+```{r}
+top_cc
+
+rm(top_cc)
+```
+
+### Figure 13: Research effort by species for SDM papers
+
+```{r}
+
+fig13_db <- re_sp %>%
+  filter (sdmtype == "SDM", num.papers != 0)
+
+fig13<-ggplot(fig13_db, aes(y=num.papers, x=species, fill=taxa)) +
+  geom_bar(stat="identity") +
+  aes (x=reorder(species, -num.papers)) +
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of SDM papers")+
+  xlab("Species")+
+  ylim(0,16)+
+  theme (axis.text.x=element_text(angle=90,size=2,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+  
+fig13
+
+rm (fig13, fig13_db)
+```
+
+### Figure 14: Research effort by species for CC-SDM papers
+
+```{r}
+fig14_db <- re_sp %>%
+  filter (sdmtype == "CC-SDM", num.papers != 0)
+
+fig14<-ggplot(fig14_db, aes(y=num.papers, x=species, fill=taxa)) +
+  geom_bar(stat="identity") +
+  aes (x=reorder(species, -num.papers)) +
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of CC-SDM papers")+
+  xlab("Species")+
+  ylim(0,16)+
+  theme (axis.text.x=element_text(angle=90,size=2,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+  
+fig14
+
+rm(fig14, fig14_db)
+
+rm(re_sp)
+```
+
+### Figure 15: Number of species vs SDM research effort
+
+```{r, echo=FALSE, fig.cap="Number of unique species vs SDM research effort (number of SDM papers modelling a species). Representation of each taxanomic group in the research effort categories are shown. The greater the number of papers that model a species, the greater the CC-SDM research effort. SDMs include CC-SDMs + non-CC-SDMs. Birds are excluded because only a partial literature search was completed for this group, and therefore we don't have accurate data on research effort for that taxa.", fig.height=5, fig.width=7}
+
+fig15_db <- fig15_16_db %>% filter (sdmtype=="SDM")
+
+fig15_db$num.papers <- factor(fig15_db$num.papers, levels = levels(factor(fig15_db$num.papers)), ordered = TRUE )
+
+fig15 <- ggplot(fig15_db, aes(y=num.species, x=num.papers, fill=taxa)) +
+  geom_bar(position="stack", stat="identity") +
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of species")+
+  xlab("Number of SDM papers per species")+
+  #ylim(0,200)+
+  theme (axis.text.x=element_text(size=10,hjust=0.95,vjust=0.2),
+         #axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+fig15
+
+rm(fig15, fig15_db)
+```
+
+### Figure 16: Number of species vs CC-SDM research effort
+
+```{r, echo=FALSE, fig.cap="Number of unique species vs CC-SDM research effort (number of CC-SDM papers modelling a species). Representation of each taxanomic group in the research effort categories are shown. The greater the number of papers that model a species, the greater the CC-SDM research effort. CC-SDM data is a subset of SDM data, shown in Figure 15. Birds are excluded because only a partial literature search was completed for this group, and therefore we don't have accurate data on research effort for that taxa.", fig.height=5, fig.width=7}
+
+fig16_db <- fig15_16_db %>% filter (sdmtype=="CC-SDM")
+
+fig16_db$num.papers <- factor(fig16_db$num.papers, levels = levels(factor(fig16_db$num.papers)), ordered = TRUE )
+
+fig16 <- ggplot(fig16_db, aes(y=num.species, x=num.papers, fill=taxa)) +
+  geom_bar(position="stack", stat="identity") +
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of species")+
+  xlab("Number of CC-SDM papers per species")+
+  #ylim(0,200)+
+  theme (axis.text.x=element_text(size=10,hjust=0.95,vjust=0.2),
+         #axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+fig16
+
+rm(fig16, fig16_db, fig15_16_db, number_ticks)
+```
+
+### Figure 17: Number of papers including each taxa
+
+```{r, echo=FALSE, fig.cap="Number of unique SDM papers (yellow) and CC-SDM (papers) including at least one species from each taxaonomic group. CC-SDMs papers are a subset of SDMs, which include CC-SDMs + non-CC-SDMs. Birds are excluded because only a partial literature search was completed for this group, and therefore we don't have accurate data on research effort for that taxa.", fig.height=5, fig.width=7}
+
+fig17 <- ggplot(fig17_db, aes(y=num.papers, x=taxa, fill=sdmtype)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.papers), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of papers")+
+  xlab(element_blank())+
+  ylim(0,50)+
+  theme (axis.text.x=element_text(angle=90, size=10,hjust=0.95,vjust=0.2),
+         #axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+
+fig17
+
+rm(fig17, fig17_db)
+```
+
+### Figure 18: Mean number of papers per species by taxa
+
+```{r, echo=FALSE, fig.cap="Mean number of SDM papers (yellow) and CC-SDM papers (purple) per species, separated by taxonomic group. Mean values include species where the number of papers = 0. CC-SDMs are a subset of SDMs, which include CC_SDMs + non-CC-SDMs. Birds are excluded because only a partial literature search was completed for this group, and therefore we don't have accurate data on research effort for that taxa.", fig.height=5, fig.width=7}
+
+fig18_db$label <- round(fig18_db$mean.paper.p.sp, digits=2)
+
+fig18 <- ggplot(fig18_db, aes(y=mean.paper.p.sp, x=taxa, fill=sdmtype)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=label), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Mean number of papers per species")+
+  xlab(element_blank())+
+  #ylim(0,50)+
+  theme (axis.text.x=element_text(angle=90, size=10,hjust=0.95,vjust=0.2),
+         #axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+
+fig18
+
+rm(fig18, fig18_db)
+```
+
+## 6) Risk status representation
+
+```{r, echo=FALSE}
+
+# 1) assign risk status for all species
+
+species <- unique (sar_sdm$species)
+
+columns <- c("species", "taxa","status", "sdm", "cc_sdm")
+rs_db = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(rs_db) = columns
+
+sp_mult_rs_db <- data.frame()
+
+for (sp in species){
+  
+  db <- sar_sdm %>%
+    filter (species==sp) %>%
+    select (common_name, species, taxonomic_group, sara_status, sdm, cc_sdm)
+  
+  tg <- unique(db$taxonomic_group)
+    
+  num_rs <- length(unique(db$sara_status))
+    
+    if (num_rs == 1) {
+      
+      risk_status <- unique(db$sara_status)
+      #rs_db[nrow(rs_db) + 1,] = c(sp, tg, unique(db$sara_status))
+      
+    }
+  
+    else if (num_rs > 1) {
+      
+      # add species data to sp_mult_rs_db
+      
+      sp_data <- unique(db %>%
+        select (common_name, species, taxonomic_group, sara_status))
+      
+      sp_mult_rs_db <- bind_rows(sp_mult_rs_db, sp_data)
+      
+      #print(sp)
+      #print(unique(db$sara_status))
+      
+      rs <- unique(db$sara_status)
+      
+      extirp <- "Extirpated" %in% rs
+      endang <- "Endangered" %in% rs
+      threat <- "Threatened" %in% rs
+      special <- "Special Concern" %in% rs
+      
+      if (extirp=="TRUE"){
+        
+        risk_status <- c("Extirpated")
+        
+         #rs_db[nrow(rs_db) + 1,] = c(sp, tg, "Extirpated")
+      }
+         
+      else if (extirp=="FALSE" & endang=="TRUE"){
+        
+        risk_status <- c("Endangered")
+        #rs_db[nrow(rs_db) + 1,] = c(sp, tg, "Endangered")
+      }
+      
+      else if (extirp=="FALSE" & endang=="FALSE" & threat=="TRUE"){
+        
+        risk_status <- c("Threatened")
+        #rs_db[nrow(rs_db) + 1,] = c(sp, tg, "Threatened")
+      }
+      
+      else if (extirp=="FALSE" & endang=="FALSE" & threat=="FALSE" & special=="TRUE"){
+        
+        risk_status <- c("Special Concern")
+        #rs_db[nrow(rs_db) + 1,] = c(sp, tg, "Special Concern")
+      }
+    }
+  
+  sdm <- unique(db$sdm)
+  cc_sdm <- unique(db$cc_sdm)
+  
+   rs_db[nrow(rs_db) + 1,] = c(sp, tg, risk_status, sdm, cc_sdm)
+  
+}
+
+write.csv (sp_mult_rs_db, paste0(path,"/data/derived-data/sp_w_mult_risk_status.csv"))
+
+rm(db, columns, sdm, cc_sdm, risk_status, tg, sp, extirp, endang, threat, special, rs, sp_data, species)
+
+# 2) Number and proportion of species in each risk status catgeory #===========
+
+status <- unique(sar_sdm$sara_status)
+
+columns <- c("status", "sdmtype", "num.sp", "prop.sp")
+num_prop_rs_db = data.frame(matrix(nrow = 0, ncol = length(columns))) 
+colnames(num_prop_rs_db) = columns
+
+rs_fig_cat <- c("Included in a SDM", "Included in a CC-SDM")
+
+for (s in status){
+  
+  tot_sp_rs <- rs_db %>%
+                  filter (status==s) %>%
+                  select(species)
+  tot_sp_rs <- length(unique(tot_sp_rs$species))
+  
+  for (type in rs_fig_cat){
+    
+    if (type=="Included in a SDM"){
+      db <- unique(rs_db %>% 
+        filter (status==s, sdm=="1") %>% 
+        select (species, status, sdm))
+    
+    }
+    
+    else if (type=="Included in a CC-SDM"){
+      db <- unique(rs_db %>% 
+        filter (status==s, cc_sdm=="1") %>% 
+        select (species, status, cc_sdm))
+    }
+    
+    num_prop_rs_db[nrow(num_prop_rs_db) + 1,] = c(s, type, length(unique(db$species)), (length(unique(db$species))/tot_sp_rs))
+    
+  }
+  
+  num_prop_rs_db[nrow(num_prop_rs_db) + 1,] = c(s, "Total with Status", tot_sp_rs, tot_sp_rs/tot_sp_rs)
+  
+  included_sdm <- num_prop_rs_db %>% 
+    filter (status==s, sdmtype=="Included in a SDM") %>%
+    select (num.sp)
+  included_sdm <- included_sdm$num.sp
+  included_sdm <- sapply(included_sdm, as.numeric)
+  
+  num_prop_rs_db[nrow(num_prop_rs_db) + 1,] = c(s, "Not included in SDM", (tot_sp_rs-included_sdm), (tot_sp_rs-included_sdm)/tot_sp_rs)
+  
+}
+
+num_prop_rs_db$num.sp <- sapply(num_prop_rs_db$num.sp, as.numeric)
+num_prop_rs_db$prop.sp <- sapply(num_prop_rs_db$prop.sp, as.numeric)
+
+check <- num_prop_rs_db %>% filter (sdmtype=="Total with Status")
+stopifnot(sum(check$num.sp) == tot_sp)
+
+rm(db, check, tot_sp_rs, columns, status, rs_fig_cat)
+```
+
+For designatable units listed under the same species name, but different threat statuses, we assigned them the higher risk status. This rule was applied for `r length(unique(sp_mult_rs_db$common_name` unique designatable units, falling under `r length(unique(sp_mult_rs_db$species` species names.
+
+```{r}
+rm(sp_mult_rs_db)
+```
+
+### Figure 19: Number of SAR modelled, by risk status
+
+```{r, echo=FALSE, fig.cap = "Number of unique species listed under each risk status modelled in a SDM (green), a CC-SDM (yellow), and total unique species with risk status (purple). Species with mutliple designatable units with different risk statuses were grouped together and assigned the highest risk status that applied to that species.", fig.height=5, fig.width=7}
+
+fig19_db <- num_prop_rs_db %>%
+  filter (sdmtype != "Not included in SDM") %>%
+  select (status, sdmtype, num.sp)
+
+fig19_db$levels <- factor(fig19_db$sdmtype, levels = c('Total with Status', 'Included in a SDM','Included in a CC-SDM'))
+
+fig19_db$status.levels <- factor(fig19_db$status, levels = c('Extirpated', 'Endangered','Threatened', 'Special Concern'), ordered = TRUE)
+
+fig19<-ggplot(fig19_db, aes(y=num.sp, x=status.levels, fill=levels)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.sp), position=position_dodge(width=0.9), vjust=-0.25, size=2)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of species")+
+  xlab(element_blank())+
+  #ylim(0,200)+
+  theme (axis.text.x=element_text(angle=90,size=10,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+
+fig19
+
+rm(fig19, fig19_db) 
+```
+
+### Figure 20: Proportion of species modelled, by risk status
+
+```{r, echo=FALSE, fig.cap = "Proportion of total species listed under each risk status modelled in a SDM (green), a CC-SDM (yellow) or not modelled at all (purple). Proportion = number of unique species with risk status modelled with SDM or CC-SDM or not modelled / total unique species with status. Species with mutliple designatable units with different risk statuses were grouped together and assigned the highest risk status that applied to that species.", fig.height=5, fig.width=7}
+
+fig20_db <- num_prop_rs_db %>%
+  filter (sdmtype != "Total with Status") %>%
+  select (status, sdmtype, prop.sp)
+
+fig20_db$prop.label <- round(fig20_db$prop.sp, digits=2)
+
+fig20_db$levels <- factor(fig20_db$sdmtype, levels = c('Not included in SDM', 'Included in a SDM','Included in a CC-SDM'))
+
+fig20_db$status.levels <- factor(fig20_db$status, levels = c('Extirpated', 'Endangered','Threatened', 'Special Concern'), ordered = TRUE)
+
+fig20<-ggplot(fig20_db, aes(y=prop.sp, x=status.levels, fill=levels)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label), position=position_dodge(width=0.9), vjust=-0.25, size=2)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Proportion of total species with status")+
+  xlab(element_blank())+
+  #ylim(0,200)+
+  theme (axis.text.x=element_text(angle=90,size=10,hjust=0.95,vjust=0.2),
+         axis.ticks.x=element_blank(),
+         #legend.position="none",
+         legend.title=element_blank())
+
+fig20
+
+rm(fig20, fig20_db)
+```
+
+## 7) Representation of subspecies
+
+-   number of subspecies listed
+
+-   number of subspecies modelled exactly
+
+-   number of subspecies whose parent species were modelled
+
+## 8) CC-SDM objectives
+
+SDM objectives are defined in the working version of the [analytical plan](https://docs.google.com/document/d/1KDdAH_9hrKGyDN4BT9bBeU5I-MhWnPa7/edit?usp=sharing&ouid=103960461658837226323&rtpof=true&sd=true).
+
+### Number and proportion of CC-SDM papers with different objectives
+
+```{r, echo=FALSE, message=FALSE,error=FALSE,warning=FALSE}
+
+### GET DATA FOR SDM OBJECTIVES ###
+## only include species searched for
+## exclude Stolar et al.
+## Calculate:
+# 1) number of cc-sdm papers per objective overall - DONE
+# 2) proportion of cc-sdm papers per objective overall ( =cc.sdm papers with objective/total cc-sdm papers) - DONE
+# 3) number of cc-sdm papers per objective by taxa - DONE
+# 4) proportion of cc-sdm papers by taxa (=cc.sdm papers with objective/cc-sdm papers including that taxa) - DONE
+# 5) proportion of species in each taxa modelled with each objective (=number of species in taxa modelled with obj / total species in taxa)
+# 6) proportion of species in each taxa that were included in a cc-sdm that have been modelled with each objective (=number of species in taxa modelled with obj / number of species in taxa included in a cc-sdm)
+
+#use subset of data that only includes species searched for, remove Stolar et al and Birds
+df<-sdm.data.subset[which(!(sdm.data.subset$paperID=="140"|sdm.data.subset$taxonomic_group=="Birds")),]
+df<-df[which(df$proj_future=="1"& (df$predictors=="1"|df$predictors=="2")),]
+num.cc.sdm<-length(unique(df$paperID)) 
+
+# get list of species searched for / all species
+spp<-read_excel(paste0(google.path,"/data/species_list.xlsx"))
+spp<-spp[which(spp$search_complete=="Y"|spp$search_complete=="Stolar/Y"),]
+names(spp)<-c("search_complete","name","sppID","common_name","species","taxa")
+conditions <- c("Vascular plants")
+replacement_values <- c("Vascular Plants")
+# Use replace() to replace the names in the 'Names' column
+spp$taxa <- replace(spp$taxa, spp$taxa %in% conditions, replacement_values)
+
+categories<-c("CC Vulnerability","Conservation and management","Methodology","Biodiversity","Genetics / evolution","Public health","Resource management","Biotic interactions")
+
+dftaxa<-data.frame()
+summary<-data.frame()
+
+for (cat in categories){
+  if (cat=="CC Vulnerability") {df2<-df[which(df$obj_cc_vulnerability=="1"),]}
+  if (cat=="Conservation and management") {df2<-df[which(df$obj_conservation=="1"),]}
+  if (cat=="Methodology"){df2<-df[which(df$obj_method=="1"),]}
+  if (cat=="Biodiversity") {df2<-df[which(df$obj_biodiversity=="1"),]}
+  if (cat=="Genetics / evolution"){df2<-df[which(df$obj_genetic=="1"),]}
+  if (cat=="Public health"){df2<-df[which(df$obj_health=="1"),]}
+  if (cat=="Resource management"){df2<-df[which(df$obj_commercial=="1"),]}
+  if (cat=="Biotic interactions"){df2<-df[which(df$obj_biotic=="1"),]}
+  
+    n<-data.frame(1)
+    n$category<-cat
+    n$papers<-length(unique(df2$paperID)) #number of cc-sdm with the obj
+    n$species<-length(unique(df2$species)) #number of species with the obj
+    summary<-bind_rows(summary,n)
+    
+    for (t in taxa){
+
+      df3<-df2[which(df2$taxonomic_group==t),] #objective data by taxa
+      df4<-df[which(df$taxonomic_group==t),] #cc-sdm data by taxa
+      taxa.spp<-spp[which(spp$taxa==t),]
+      
+      m<-data.frame(1)
+      m$taxa<-t
+      m$category<-cat
+      
+      ### OVERALL NUMBERS
+      m$total.cc.paper<-length(unique(df4$paperID)) #total cc-sdm papers
+      m$species.tot<-length(unique(taxa.spp$species)) #tot species in group
+      m$cc.sdm.spp.tot<-length(unique(df4$species)) #tot spp in cc-sdm
+      
+      ### NUMBER OF SPP AND PAPERS IN GROUP WITH OBJ
+      m$paper.obj<-length(unique(df3$paperID)) #papers with obj
+      m$species.obj<-length(unique(df3$species)) #species with obj
+      
+      ###PROPORTION CALCULATIONS
+      #PROP of cc-sdm papers that include group that modelled with obj
+      m$prop.paper.obj<-round(m$paper.obj/m$total.cc.paper,digits=3)  
+      #PROP of species in group with cc-sdm thta have been modelled with obj
+      m$species.prop.cc.sdm<-round(m$species.obj/m$cc.sdm.spp.tot, digits = 3)
+      #PROP of total species in group modelled with obj
+      m$species.prop.of.tot<-round(m$species.obj/m$species.tot, digits=3)
+
+      dftaxa<-bind_rows(dftaxa,m)
+    
+  }
+}
+
+summary$prop.papers<-round(summary$papers/num.cc.sdm,digits=3)
+
+write.csv(dftaxa,paste0(path,"/data/pt1/objectives_byTAXA.csv"))
+write.csv(summary,paste0(path,"/data/pt1/objectives_summary.csv"))
+```
+
+```{r, echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, fig.cap="Figure 14. Number (A) and proportion (B) of CC-SDM papers that had main objectives in each category. Proportion was calculated as: number of CC-SDM papers with the objective / total number of CC-SDMs (n=49). Each paper was categorized to have 3 major objecives at maximum, so the total number of papers across the objective categories will be greater than the number of CC-SDM papers (n=49), and the sum of the proportions will be greater than 1. This data only includes papers that included species targeted in the Web of Science searched (n=287). Stolar et al. (in prep) has been excluded. Papers that model only birds have also been removed (n=1).",fig.height=8,fig.width=7}
+
+summary$Label<-with(summary, reorder(category, papers))
+
+fig14.panel1<-ggplot(summary, aes(y=papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of CC-SDM papers")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+#fig14.panel1
+
+fig14.panel2<-ggplot(summary, aes(y=prop.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Proportion of CC-SDM papers")+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="bottom",
+         legend.title=element_blank())
+
+#fig14.panel2
+
+plot_grid(fig14.panel1,fig14.panel2, labels=c("A","B"),ncol=1)
+
+rm(df2,df3,df4,m,n,summary,fig14.panel1,fig14.panel2)
+```
+
+### Number and proportion of CC-SDM papers with different objectives, by taxa
+
+```{r,echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, fig.cap="Figure 15. Number (A-E) and proportion (F-J) of CC-SDM papers that had main objectives in each category, separated by taxa. Proportion was calculated using the number of CC-SDM with the objective / total number of CC-SDMs that included species from each group (see Figure 9). Each paper was categorized to have 3 major objecives at maximum, so the total number of papers across the objective categories will be greater than the number of CC-SDM papers (n=49), and the sum of the proportions will be greater than 1. Stolar et al. (in prep) has been excluded. Once Stolar was removed, Molluscs, Mosses and Lichens did not have any CC-SDM data, thus there are not graphs for these groups. Papers that model only birds (n=1) have also been removed. This data only includes papers that included species targeted in the Web of Science searces (n=287).",fig.height=10,fig.width=12}
+
+dftaxa$Label<-with(dftaxa, reorder(taxa, paper.obj))
+dftaxa$prop.label<-round(dftaxa$prop.paper.obj,digits=1)
+dftaxa$prop.label.sp<-round(dftaxa$species.prop.of.tot, digits=1)
+dftaxa$prop.label.sp2<-round(dftaxa$species.prop.cc.sdm,digits=1)
+
+Arthropods<-dftaxa[which(dftaxa$taxa=="Arthropods"),]
+Amphibians<-dftaxa[which(dftaxa$taxa=="Amphibians"),]
+Lichens<-dftaxa[which(dftaxa$taxa=="Lichens"),]
+Mammals<-dftaxa[which(dftaxa$taxa=="Mammals (terrestrial)"),]
+Molluscs<-dftaxa[which(dftaxa$taxa=="Molluscs"),]
+Mosses<-dftaxa[which(dftaxa$taxa=="Mosses"),]
+Reptiles<-dftaxa[which(dftaxa$taxa=="Reptiles"),]
+Plants<-dftaxa[which(dftaxa$taxa=="Vascular Plants"),]
+
+### Create legend
+
+legend<-ggplot(Amphibians, aes(y=paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  theme (#legend.position="centre",
+         legend.title=element_blank())
+legend<-get_legend(legend)
+
+### AMPHIBIAN graphs 
+
+Amph.num<-ggplot(Amphibians, aes(y=paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.obj), position=position_dodge(width=0.9), vjust=-0.25, size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of CC-SDM papers")+
+  ggtitle("Amphibians")+
+  xlab(element_blank())+
+  ylim(0,15)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Amph.prop<-ggplot(Amphibians, aes(y=prop.paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label), position=position_dodge(width=0.9), vjust=-0.25, size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Prop of papers with objective")+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### ARTHROPOD graphs 
+
+Arth.num<-ggplot(Arthropods, aes(y=paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.obj), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ylim(0,15)+
+  #ylab("Number of CC-SDM papers")+
+  ggtitle("Arthropods")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Arth.prop<-ggplot(Arthropods, aes(y=prop.paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### MAMMAL graphs 
+
+Mam.num<-ggplot(Mammals, aes(y=paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.obj), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  ylim(0,15)+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ggtitle("Mammals")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Mam.prop<-ggplot(Mammals, aes(y=prop.paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### REPTILE graphs 
+
+Rep.num<-ggplot(Reptiles, aes(y=paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.obj), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  ylim(0,15)+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ggtitle("Reptiles")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Rep.prop<-ggplot(Reptiles, aes(y=prop.paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### VASCULAR PLANT graphs 
+
+Plant.num<-ggplot(Plants, aes(y=paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.obj), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  ylim(0,15)+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ggtitle("Vascular Plants")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Plant.prop<-ggplot(Plants, aes(y=prop.paper.obj, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+plot_grid(Amph.num,Arth.num,Mam.num,Rep.num,Plant.num,Amph.prop,Arth.prop,Mam.prop,Rep.prop,Plant.prop,legend,nrow = 3,ncol=5,labels=c("A","B","C","D","E","F","G","H","I","J",""))
+
+rm(Amph.num,Amph.prop,Arth.num,Arth.prop,Mam.num,Mam.prop,Rep.num,Rep.prop,Plant.num,Plant.prop,legend)
+
+```
+
+### Proportion of species in each group and proportion of species in each group included in a CC-SDM that have been modelled with each objective type
+
+```{r, echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, fig.cap="Figure 16. Proportion of total species in each group (A-E) and proprtion of species that were included in a CC-SDM (F-J) that were modelled with each objective, separated by taxa. Proportion of species in each group (A-E) was calculated as: number of species in the group modelled with each objective / total species in the group. Proportion of species included in a CC-SDM (F-J) was calculated as: the number of species in the group modelled with each objective / number of species in the group included in a CC-SDM. Species may have been included in multiple papers with different objectives, thus the sum of the objective proportions for each group will be greater than 1. Stolar et al (in prep) and papers that only model Birds (n=1) are not included. Once Stolar et al. (in prep) was removed, there wasn't any CC-SDM data for Lichens, Mosses and Molluscs, thus there are no graphs for those groups. This data only includes species that were targeted in the Web of Science searches (n=287).", fig.height=10,fig.width=12}
+
+##create legend
+legend<-ggplot(Amphibians, aes(y=species.prop.of.tot, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  theme (#legend.position="centre",
+         legend.title=element_blank())
+legend<-get_legend(legend)
+
+### AMPHIBIAN graphs 
+
+Amph.ptot<-ggplot(Amphibians, aes(y=species.prop.of.tot, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Prop of total species in group")+
+  ggtitle("Amphibians")+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Amph.pcc<-ggplot(Amphibians, aes(y=species.prop.cc.sdm, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp2), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Prop of species in CC-SDM")+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### ARTHROPOD GRAPHS
+
+Arth.ptot<-ggplot(Arthropods, aes(y=species.prop.of.tot, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+    ylim(0,1)+
+  ggtitle("Arthropods")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Arth.pcc<-ggplot(Arthropods, aes(y=species.prop.cc.sdm, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp2), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+    ylim(0,1)+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### MAMMALS GRAPHS
+
+Mam.ptot<-ggplot(Mammals, aes(y=species.prop.of.tot, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+    ylim(0,1)+
+  ggtitle("Mammals")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Mam.pcc<-ggplot(Mammals, aes(y=species.prop.cc.sdm, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp2), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+    ylim(0,1)+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### REPTILE GRAPHS
+
+Rep.ptot<-ggplot(Reptiles, aes(y=species.prop.of.tot, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  ylim(0,1)+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ggtitle("Reptiles")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Rep.pcc<-ggplot(Reptiles, aes(y=species.prop.cc.sdm, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp2), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  ylim(0,1)+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### VASCULAR PLANT GRAPHS
+
+Plant.ptot<-ggplot(Plants, aes(y=species.prop.of.tot, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ggtitle("Vascular Plants")+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Plant.pcc<-ggplot(Plants, aes(y=species.prop.cc.sdm, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.label.sp2), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+plot_grid(Amph.ptot, Arth.ptot, Mam.ptot, Rep.ptot, Plant.ptot, Amph.pcc,Arth.pcc,Mam.pcc,Rep.pcc,Plant.pcc,legend,nrow = 3,ncol=5,labels=c("A","B","C","D","E","F","G","H","I","J",""))
+
+#fig15<-plot_grid(A,B,D,G,H,legend, labels=c("A","B","C","D","E"),ncol=1,nrow=6)
+#fig15
+#y.grob <- textGrob("Number of papers with each objective", rot=90)
+#a<-grid.arrange(arrangeGrob(fig15, left = y.grob))
+
+rm(all.taxa.data,Amph.ptot,Amph.pcc,Amphibians,Arth.ptot,Arth.pcc,Arthropods,cc.taxa.data,df,dftaxa,legend,Lichens,Mam.pcc,Mam.ptot,Mammals,Molluscs,Mosses,Plant.pcc,Plant.ptot,Plants, Reptiles,Rep.ptot,Rep.pcc,taxa.data,taxa.spp,cat,categories,conditions,replacement_values)
+```
+
+## 9) Geographic trends / niche truncation
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+### GET DATA FOR FOLLOWING FIGURES
+## exclude Stolar et al (in prep)
+## only include species searched for on Web of Science
+## DATA REQUIRED:
+# 1) number of papers in each category
+# 2) proportion of CC-SDM papers in each category
+# 3) number of papers in each category, by taxa
+# 4) proportion of CC-SDM papers in each category, by taxa
+# 5) number of species in each category
+# 6) proportion of species in each category (out of total species in group)
+# 7) proportion of species in each category (out of species included in CC-SDM)
+
+#cc-sdm data for species targetted, remove Birds and Stolar paper
+df<-sdm.data
+df<-df[which(df$proj_future=="1"& (df$predictors=="1"|df$predictors=="2")),]
+cc.sdm.paper<-length(unique(df$paperID)) 
+cc.spp<-length(unique(df$species))
+
+spp.list<-read.csv(paste0(path,"/data/pt1/sdm.summary.bySPECIES.csv"))
+
+# use "spp" from last section as the list of species that were searched for
+num.spp<-length(unique(spp$species))
+
+categories<-c("Full range","National boundaries","Provincial/state boundaries","Other")
+
+bytaxa<-data.frame()
+summary<-data.frame()
+
+## DATA ON THE DIFFERENT TYPES OF SPATIAL EXTENTS USED
+
+for (cat in categories){
+  
+  if (cat=="Full range") {df2<-df[which(df$spatial.limits=="1"),]}
+  if (cat=="National boundaries") {df2<-df[which(df$spatial.limits=="2"),]}
+  if (cat=="Provincial/state boundaries") {df2<-df[which(df$spatial.limits=="3"),]}
+  if (cat=="Other") {df2<-df[which(df$spatial.limits=="4"),]}
+    
+  m<-data.frame(1)
+  m$category<-cat
+  m$num.papers<-length(unique(df2$paperID))
+  m$num.species<-length(unique(df2$species))
+  
+  summary<-bind_rows(summary,m)
+  
+  ## DATA BY TAXA ##
+  
+  for (t in taxa){
+    #get category data for taxa
+    df3<-df2[which(df2$taxonomic_group==t),]
+    #get list of species searched for in taxa
+    spp.in.taxa<-spp[which(spp$taxa==t),] 
+    #get all cc-sdm data for taxa
+    cc.sdm.taxa<-df[which(df$taxonomic_group==t),]
+    cc.sdm.paper.taxa<-length(unique(cc.sdm.taxa$paperID))
+    
+    n<-data.frame(1)
+    n$category<-cat
+    n$taxa<-t
+    
+    ##PAPER NUMBER AND PROPORTION DATA
+    #num of cc-sdm papers in category
+    n$num.cat.papers<-length(unique(df3$paperID)) 
+    #num of cc-sdm papers
+    n$num.cc.papers<-length(unique(cc.sdm.taxa$paperID)) 
+    #prop of cc-sdm papers that model group
+    n$prop.papers<-round(n$num.cat.papers/n$num.cc.papers, digits=3)
+    
+    ##SPECIES NUMBER AND PROPORTION DATA
+    #num of species with cc-sdm in category
+    n$num.cat.species<-length(unique(df3$species)) 
+    #num species in group
+    n$num.spp.taxa<-length(unique(spp.in.taxa$species)) 
+    #num species with cc-sdm
+    n$num.spp.cc.sdm<-length(unique(cc.sdm.taxa$species))
+    #prop of total species in taxa with cc-sdm in category
+    n$prop.spp.tot.cat<-round(n$num.cat.species/n$num.spp.taxa, digits=3)
+    #prop of species in taxa included in a cc-sdm, with a paper in category
+    n$prop.spp.cc.cat<-round(n$num.cat.species/n$num.spp.cc.sdm, digits=3)
+
+    bytaxa<-bind_rows(bytaxa,n)
+    }
+  }
+
+summary$prop.papers<-round(summary$num.papers/cc.sdm.paper,digits=3)
+summary$prop.spp.total<-round(summary$num.species/num.spp, digits=3)
+summary$prop.spp.cc<-round(summary$num.species/cc.spp, digits=3)
+
+## DATA ON COUNTRIES INCLUDED IN SPATIAL EXTENT OF DATA USED TO TRAIN MODEL
+
+country.combo<-c("Canada only","US only","Mexico only","Canada and US","US and Mexico","Canada and Mexico","Canada, United States and Mexico","Full range")
+
+country.data.summary<-data.frame()
+country.data.bytaxa<-data.frame()
+
+for (t in taxa) {
+
+  for (count in country.combo){
+    
+      if (count=="Full range"){combo<-df[which(df$spatial.limits=="1"),]}
+    
+      if (count!="Full range"){df2<-df[which(!(df$spatial.limits=="1")),]
+      
+      if (count=="Canada only"){combo<-df2[which(df2$built_CA=="1"&df2$built_MX=="0"&df2$built_US=="0"),]}
+      if(count=="US only"){combo<-df2[which(df2$built_CA=="0"&df2$built_MX=="0"&df2$built_US=="1"),]}
+      if (count=="Mexico only"){combo<-df2[which(df2$built_CA=="0"&df2$built_MX=="1"&df2$built_US=="0"),]}
+      if (count=="Canada and US"){combo<-df2[which(df2$built_CA=="1"&df2$built_MX=="0"&df2$built_US=="1"),]}
+      if (count=="US and Mexico"){combo<-df2[which(df2$built_CA=="0"&df2$built_MX=="1"&df2$built_US=="1"),]}
+      if (count=="Canada and Mexico"){combo<-df2[which(df2$built_CA=="1"&df2$built_MX=="1"&df2$built_US=="0"),]}
+      if (count=="Canada, United States and Mexico"){combo<-df2[which(df2$built_CA=="1"&df2$built_MX=="1"&df2$built_US=="1"),]}
+      }
+      
+      #### SUMMARY DATA ####
+        o<-data.frame(1)
+        o$country.combo<-count
+        o$paper.num<-length(unique(combo$paperID))
+        #proportion of papers in category
+        #o$paper.prop.cat<-round(o$paper.num/m$num.papers,digits=3)
+        o$species.num<-length(unique(combo$species))
+        #proportion of all species
+        o$species.prop.tot<-round(o$species.num/num.spp, digits=3)
+        o$species.prop.cc<-round(o$species.num/cc.spp,digits=3)
+        country.data.summary<-bind_rows(country.data.summary,o)
+        
+      #### BY TAXA ####
+        p<-data.frame(1)
+        p$taxa<-t
+        p$country.combo<-count
+        
+        combo2<-combo[which(combo$taxonomic_group==t),]
+        p$paper.num<-length(unique(combo2$paperID))
+        p$species.num<-length(unique(combo2$species))
+        
+        #proportion of species in group
+        spp.list.taxa<-spp.list[which(spp.list$taxonomic_group==t),]
+        spp.taxa<-length(unique(spp.list.taxa$species))
+        p$prop.spp.taxa<-p$species.num/spp.taxa
+      
+        #proportion of species in group with a cc-sdm
+        spp.cc.taxa<-spp.list.taxa[which(spp.list.taxa$cc.sdm=="1"),]
+        spp.cc.taxa<-length(unique(spp.cc.taxa$species))
+        p$prop.spp.cc<-p$species.num/spp.cc.taxa
+        
+        cc.paper.data<-bytaxa[which(bytaxa$taxa==t),]
+        cc.paper.data<-cc.paper.data[1,]
+        p$num.cc.paper<-cc.paper.data$num.cc.papers
+        
+        country.data.bytaxa<-bind_rows(country.data.bytaxa,p)
+      
+  }
+}
+
+## DATA ON THE FOCUS COUNTRIES
+
+spatial.focus.summary<-data.frame()
+
+for (count in country.combo){
+  
+  df2<-df
+  
+  if (count!="Full range"){
+  
+    if (count=="Canada only"){combo<-df2[which(df$focus_CA=="1"&df2$focus_MX=="0"&df2$focus_US=="0"),]}
+    if(count=="US only"){combo<-df2[which(df2$focus_CA=="0"&df2$focus_MX=="0"&df2$focus_US=="1"),]}
+    if (count=="Mexico only"){combo<-df2[which(df2$focus_CA=="0"&df2$focus_MX=="1"&df2$focus_US=="0"),]}
+    if (count=="Canada and US"){combo<-df2[which(df2$focus_CA=="1"&df2$focus_MX=="0"&df2$focus_US=="1"),]}
+    if (count=="US and Mexico"){combo<-df2[which(df2$focus_CA=="0"&df2$focus_MX=="1"&df2$focus_US=="1"),]}
+    if (count=="Canada and Mexico"){combo<-df2[which(df2$focus_CA=="1"&df2$focus_MX=="1"&df2$focus_US=="0"),]}
+    if (count=="Canada, United States and Mexico"){combo<-df2[which(df2$focus_CA=="1"&df2$focus_MX=="1"&df2$focus_US=="1"),]}
+  
+      p<-data.frame(1)
+      p$country.combo<-count
+      p$paper.num<-length(unique(combo$paperID))
+      #proportion of papers in category
+      #o$paper.prop.cat<-round(o$paper.num/m$num.papers,digits=3)
+      p$species.num<-length(unique(combo$species))
+      #proportion of all species
+      #o$species.prop.tot<-round(o$species.num/num.spp, digits=3)
+      #o$species.prop.cc<-round(o$species.num/cc.spp,digits=3)
+      spatial.focus.summary<-bind_rows(spatial.focus.summary,p)
+  }
+  
+    if (count=="Full range"){}
+  
+}
+
+write.csv(bytaxa,paste0(path,"/data/pt1/spatialcategories_byTAXA.csv"))
+write.csv(summary,paste0(path,"/data/pt1/spatialcategories_summary.csv"))
+write.csv(country.data.summary,paste0(path,"/data/pt1/spatial.country.combo_summary.csv"))
+write.csv(spatial.focus.summary,paste0(path,"/data/pt1/spatial.focus_summary.csv"))
+
+#rm(df,df2,df3,cc.sdm.taxa,m,n,o,p,spp,spp.in.taxa,cc.sdm.paper,cc.spp)
+
+```
+
+### Number and proportion of CC-SDM papers in each category
+
+```{r,echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, fig.cap="Figure 17. The number (A) and proportion (B) of CC-SDM papers that used the different categories of spatial extents to train the SDMs used to project future suitability. Each CC-SDM paper was assigned to one spatial extent category. Proportion was calculated as: number of CC-SDMs with spatial extents in the category / total number of CC-SDMs (n=49). Papers included in the full range category used data from the species' full North American range were used to build the model. Papers included in the other categories did not use data from the species entire range to build the SDM(s). These papers use one or more national or provincial/territorial/state boundary, or other boundaries (e.g., park boundaries, ecozones, counties) to delimit the spatial limits of the data. Stolar et al (in prep) is not included, and neither are papers that model only birds (n=1). This data only includes papers that included at least one species searched for on the Web of Science (n=287).", fig.height=6, fig.width=7}
+
+summary$Label<-with(summary, reorder(category, num.papers))
+
+paper.num<-ggplot(summary,aes(y=num.papers,x=Label,fill=category)) +
+    geom_bar(position="dodge", stat="identity") +
+    geom_text(aes(label=num.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+    theme_classic()+
+    scale_fill_viridis(discrete=TRUE)+
+    xlab(element_blank())+
+    ylab("Number of papers")+
+  ylim(0,35)+
+    theme(axis.ticks.x=element_blank(),
+          legend.position = "none",
+          legend.title = element_blank())
+
+paper.prop.total<-ggplot(summary,aes(y=prop.papers,x=Label,fill=category)) +
+    geom_bar(position="dodge", stat="identity") +
+    geom_text(aes(label=prop.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+    theme_classic()+
+    scale_fill_viridis(discrete=TRUE)+
+    xlab(element_blank())+
+    ylab("Prop of papers")+
+  ylim(0,1)+
+    theme(axis.ticks.x=element_blank(),
+          legend.position = "bottom",
+          legend.title = element_blank())
+
+plot_grid(paper.num,paper.prop.total,labels=c("A","B",""),nrow=2,ncol=1)
+
+rm(paper.num,paper.prop.total)
+```
+
+### Number and proportion of species included in at least one CC-SDM in each spatial limit category
+
+```{r, echo=FALSE, message=FALSE,error=FALSE,warning=FALSE,fig.cap="Figure 18. A) Number of species, B) proportion of species out of all species, and C) proportion of species out of species included in a CC-SDM (n=68) included in each category of spatial limits. Each paper was assigned to one spatial exent category which described the spatial extent of the data used to train the SDM that was then used to project future distribution. Proportion of species out of all species (B) was calculated as: number of species included in an CC-SDM with a spatial extent in the category / total number of species (n=287). Proportion of species out of the species included in a CC-SDM was calculated as: number of species included in a CC-SDM with a spatial extent in the category / number of species included in a CC-SDM (n=68). Papers included in the full range category used data from the species' full North American range were used to build the model. Papers included in the other categories did not use data from the species entire range to build the SDM(s). These papers use one or more national or provincial/territorial/state boundary, or other boundaries (e.g., park boundaries, ecozones, counties) to delimit the spatial limits of the data. Species may have been included in more than one paper, which may have had spatial extents in different categories. Thus, the sum of the number and proportion of species in the graphs will be greater than 68 and 1, respectively. Stolar et al (in prep) is not included, and neither are papers that model only birds (n=1). This data only includes papers that included at least one species searched for on the Web of Science (n=287).",fig.height=8,fig.width=7}
+
+species.num<-ggplot(summary,aes(y=num.species,x=Label,fill=category)) +
+    geom_bar(position="dodge", stat="identity") +
+    geom_text(aes(label=num.species), position=position_dodge(width=0.9), vjust=-0.25)+
+    theme_classic()+
+    scale_fill_viridis(discrete=TRUE)+
+    xlab(element_blank())+
+    ylab("Number of species")+
+  ylim(0,70)+
+    theme(axis.ticks.x=element_blank(),
+          legend.position = "none",
+          legend.title = element_blank())
+
+spp.prop.total<-ggplot(summary,aes(y=prop.spp.total,x=Label,fill=category)) +
+    geom_bar(position="dodge", stat="identity") +
+    geom_text(aes(label=prop.spp.total), position=position_dodge(width=0.9), vjust=-0.25)+
+    theme_classic()+
+    scale_fill_viridis(discrete=TRUE)+
+    xlab(element_blank())+
+    ylab("Prop of all species")+
+  ylim(0,1)+
+    theme(axis.ticks.x=element_blank(),
+          legend.position = "none",
+          legend.title = element_blank())
+
+spp.prop.cc<-ggplot(summary,aes(y=prop.spp.cc,x=Label,fill=category)) +
+    geom_bar(position="dodge", stat="identity") +
+    geom_text(aes(label=prop.spp.cc), position=position_dodge(width=0.9), vjust=-0.25)+
+    theme_classic()+
+    scale_fill_viridis(discrete=TRUE)+
+    xlab(element_blank())+
+    ylab("Prop of species in a CC-SDM")+
+  ylim(0,1)+
+    theme(axis.ticks.x=element_blank(),
+          legend.position = "bottom",
+          legend.title = element_blank())
+
+plot_grid(species.num,spp.prop.total,spp.prop.cc,labels=c("A","B","C"),nrow=3,ncol=1)
+
+rm(spp.prop.cc,spp.prop.total,species.num)
+
+```
+
+### Number and proportion of papers in each category, separated by taxa
+
+```{r,echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, fig.cap="Figure 19. Number of CC-SDM papers (A-E), and proportion of CC-SDM papers (F-J), that used the different categories of spatial extent, separated by taxa. Each paper was assigned to one spatial exent category which described the spatial extent of the data used to train the SDM that was then used to project future distribution. Proportion of papers (F-J) was calculated as: number of CC-SDM papers that used spatial extent in the category / total number of CC-SDM that included at least one species in the group. Papers included in the full range category used data from the species' full North American range were to build the model. Papers included in the other categories did not use data from the species entire range to build the SDM(s). These papers use one or more national or provincial/territorial/state boundary, or other boundaries (e.g., park boundaries, ecozones, counties) to delimit the spatial limits of the data. Stolar et al (in prep) is not included, and neither are papers that model only birds. Once Stolar et al (in prep) was removed, there was no CC-SDM data for Mosses, Molluscs and Lichens, so no graph is presented for those groups.", fig.height=8, fig.width=12}
+
+bytaxa$Label<-with(bytaxa, reorder(category, num.cat.papers))
+bytaxa$prop.label1<-round(bytaxa$prop.papers,digits=1)
+
+Arthropods<-bytaxa[which(bytaxa$taxa=="Arthropods"),]
+Amphibians<-bytaxa[which(bytaxa$taxa=="Amphibians"),]
+Lichens<-bytaxa[which(bytaxa$taxa=="Lichens"),]
+Mammals<-bytaxa[which(bytaxa$taxa=="Mammals (terrestrial)"),]
+Molluscs<-bytaxa[which(bytaxa$taxa=="Molluscs"),]
+Mosses<-bytaxa[which(bytaxa$taxa=="Mosses"),]
+Reptiles<-bytaxa[which(bytaxa$taxa=="Reptiles"),]
+Plants<-bytaxa[which(bytaxa$taxa=="Vascular Plants"),]
+
+legend<-ggplot(Arthropods, aes(y=num.cat.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  theme(legend.title = element_blank())
+
+legend<-get_legend(legend)
+
+## AMPHIBIAN FIGURES
+
+Amph.num<-ggplot(Amphibians, aes(y=num.cat.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of papers")+
+  xlab(element_blank())+
+  ylim(0,15)+
+  ggtitle("Amphibians")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Amph.prop<-ggplot(Amphibians, aes(y=prop.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Proportion of papers that model group")+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### ARTHROPOD FIGURES
+
+Arth.num<-ggplot(Arthropods, aes(y=num.cat.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,15)+
+  ggtitle("Arthropods")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+
+Arth.prop<-ggplot(Arthropods, aes(y=prop.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### MAMMAL FIGURES
+
+Mam.num<-ggplot(Mammals, aes(y=num.cat.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,15)+
+  ggtitle("Mammals")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Mam.prop<-ggplot(Mammals, aes(y=prop.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### REPTILE FIGURES
+
+Rep.num<-ggplot(Reptiles, aes(y=num.cat.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,15)+
+  ggtitle("Reptiles")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Rep.prop<-ggplot(Reptiles, aes(y=prop.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### PLANTS FIGURES
+
+Plant.num<-ggplot(Plants, aes(y=num.cat.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,15)+
+  ggtitle("Vascular Plants")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Plant.prop<-ggplot(Plants, aes(y=prop.papers, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.papers), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+
+plot_grid(Amph.num,Arth.num,Mam.num,Rep.num,Plant.num,legend,Amph.prop,Arth.prop,Mam.prop,Rep.prop,Plant.prop,labels=c("A","B","C","D","E","","F","G","H","I","J"),nrow=2,ncol=6)
+
+rm(Amph.num,Amph.prop,Arth.num,Arth.prop,Mam.num,Mam.prop,Rep.num,Rep.prop,Plant.num,Plant.prop,legend)
+
+```
+
+### Number and proportion of species included in a CC-SDM in each category, separated by taxa
+
+```{r, echo=FALSE, message=FALSE,error=FALSE,warning=FALSE,fig.cap="Figure 20. A-E) Number of species, F-J) proportion of species out of all species, and K-O) proportion of species out of species included in a CC-SDM included in each category of spatial limits, separated by taxa. Each paper was assigned to one spatial exent category which described the spatial extent of the data used to train the SDM that was then used to project future distribution. Proportion of species out of all species in group (F-J) was calculated as: number of species in the group included in an CC-SDM with a spatial extent in the category / number of species in the group. Proportion of species out of the species included in a CC-SDM (K-O) was calculated as: number of species in the group included in a CC-SDM with a spatial extent in the category / number of species in the group included in a CC-SDM. Papers included in the full range category used data from the species' full North American range were used to build the model. Papers included in the other categories did not use data from the species entire range to build the SDM(s). These papers use one or more national or provincial/territorial/state boundary, or other boundaries (e.g., park boundaries, ecozones, counties) to delimit the spatial limits of the data. Species may have been included in more than one paper, which may have had spatial extents in different categories. Thus, the sum of the number and proportion of species in the graphs will be greater than the total species per group and 1, respectively. Stolar et al (in prep) is not included, and neither are papers that model only birds (n=1). After removing Stolar et al (in prep) there was no CC-SDM data for Mosses, Molluscs and Lichens which is why there are no graphs for those groups. ",fig.height=12,fig.width=12}
+
+legend<-ggplot(Arthropods, aes(y=num.cat.species, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  theme(legend.title=element_blank())
+
+legend<-get_legend(legend)
+
+## AMPHIBIAN FIGURES
+
+Amph.num<-ggplot(Amphibians, aes(y=num.cat.species, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.species), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of species")+
+  xlab(element_blank())+
+  ylim(0,20)+
+  ggtitle("Amphibians")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Amph.prop.tot<-ggplot(Amphibians, aes(y=prop.spp.tot.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.tot.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Proportion of species in group")+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Amph.prop.cc<-ggplot(Amphibians, aes(y=prop.spp.cc.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.cc.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Prop of spp in group included in a CC-SDM")+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+## ARTHROPOD FIGURES
+
+Arth.num<-ggplot(Arthropods, aes(y=num.cat.species, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.species), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,20)+
+  ggtitle("Arthropods")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Arth.prop.tot<-ggplot(Arthropods, aes(y=prop.spp.tot.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.tot.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Arth.prop.cc<-ggplot(Arthropods, aes(y=prop.spp.cc.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.cc.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+## MAMMAL FIGURES
+
+Mam.num<-ggplot(Mammals, aes(y=num.cat.species, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.species), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,20)+
+  ggtitle("Mammals")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Mam.prop.tot<-ggplot(Mammals, aes(y=prop.spp.tot.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.tot.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Mam.prop.cc<-ggplot(Mammals, aes(y=prop.spp.cc.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.cc.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+## REPTILES FIGURES
+
+Rep.num<-ggplot(Reptiles, aes(y=num.cat.species, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.species), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,20)+
+  ggtitle("Reptiles")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Rep.prop.tot<-ggplot(Reptiles, aes(y=prop.spp.tot.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.tot.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Rep.prop.cc<-ggplot(Reptiles, aes(y=prop.spp.cc.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.cc.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+## PLANT FIGURES
+
+Plant.num<-ggplot(Plants, aes(y=num.cat.species, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=num.cat.species), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,20)+
+  ggtitle("Vascular Plants")+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Plant.prop.tot<-ggplot(Plants, aes(y=prop.spp.tot.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.tot.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Plant.prop.cc<-ggplot(Plants, aes(y=prop.spp.cc.cat, x=Label, fill=category)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.spp.cc.cat), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+plot_grid(Amph.num,Arth.num,Mam.num,Rep.num,Plant.num,Amph.prop.tot,Arth.prop.tot,Mam.prop.tot,Rep.prop.tot,Plant.prop.tot,Amph.prop.cc,Arth.prop.cc,Mam.prop.cc,Rep.prop.cc,Plant.prop.cc,legend,labels=c("A","B","C","D","E","F","G","H","I","J","K","L","M","N","O",""),ncol=5,nrow=4)
+
+rm(Amph.num,Arth.num,Mam.num,Rep.num,Plant.num,Amph.prop.tot,Arth.prop.tot,Mam.prop.tot,Rep.prop.tot,Plant.prop.tot,Amph.prop.cc,Arth.prop.cc,Mam.prop.cc,Rep.prop.cc,Plant.prop.cc,legend)
+
+
+```
+
+### Number and proportion of CC-SDM papers that used data from different North American countries / combinations of North American countries to build the SDM
+
+```{r, echo=FALSE,error=FALSE, message=FALSE, warning=FALSE, fig.height=8, fig.width=7, fig.cap="Figure 21. Number (A) and proportion (B) of CC-SDM papers that used data from different North American countries / combination of North American countries to build the SDM. Papers included in the 'full range' category used data from the all of the North American countries that fell within their full range. Papers included in categories that are not 'full range' truncated the niche of species modelled (i.e., did not include data from the entire range) when training the SDM. Proportion was calculated as: # of papers within category / # of CC-SDMs (n=49)."}
+
+country.data.summary$Label<-with(country.data.summary, reorder(country.combo, paper.num))
+country.data.summary$paper.prop<-round(country.data.summary$paper.num/num.cc.sdm, digits=3)
+
+num<-ggplot(country.data.summary,aes(y=paper.num,x=Label,fill=Label))+
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.num), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of papers")+
+  xlab(element_blank())+
+  ylim(0,30)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+prop<-ggplot(country.data.summary,aes(y=paper.prop,x=Label,fill=Label))+
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.prop), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Proportion of papers")+
+  xlab(element_blank())+
+  ylim(0,1)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="bottom",
+         legend.title=element_blank())
+
+plot_grid(num,prop,lables=c("A","B"),nrow=2,ncol=1)
+```
+
+### Number and proportion of species included in a CC-SDM paper that used data from different North American countries / combinations of North American countries to build the SDM
+
+```{r, echo=FALSE, message=FALSE,error=FALSE,warning=FALSE}
+
+legend<-
+
+```
+
+### Number and proportion of CC-SDM papers that used data from different North American countries / combinations of North American countries to build the SDM, by taxa
+
+```{r, echo=FALSE, message=FALSE,error=FALSE,warning=FALSE,fig.height=8, fig.width=12, fig.cap="Figure 22. Number of CC-SDM papers (A) and proportion of CC-SDM papers that model each group (B) that used data from different North American countries/ combinations of North American countries to build the SDM, separated by taxa.Papers included in the 'full range' category used data from the all of the North American countries that fell within their full range. Papers included in categories that are not 'full range' truncated the niche of species modelled (i.e., did not include data from the entire range) when training the SDM. Proportion was calculated as: # of papers within category that model the group / # of CC-SDMs that model the group (see Figure 12). Some papers modelled species across taxa, thus the sum of the number of papers across taxa may equal more than the total number of CC-SDMs."}
+
+country.data.bytaxa$Label<-with(country.data.bytaxa, reorder(country.combo, paper.num))
+country.data.bytaxa$prop.paper<-round(country.data.bytaxa$paper.num/country.data.bytaxa$num.cc.paper, digits=2) #proportion of papers that model that group
+dftaxa<-country.data.bytaxa
+
+Arthropods<-dftaxa[which(dftaxa$taxa=="Arthropods"),]
+Amphibians<-dftaxa[which(dftaxa$taxa=="Amphibians"),]
+Lichens<-dftaxa[which(dftaxa$taxa=="Lichens"),]
+Mammals<-dftaxa[which(dftaxa$taxa=="Mammals (terrestrial)"),]
+Molluscs<-dftaxa[which(dftaxa$taxa=="Molluscs"),]
+Mosses<-dftaxa[which(dftaxa$taxa=="Mosses"),]
+Reptiles<-dftaxa[which(dftaxa$taxa=="Reptiles"),]
+Plants<-dftaxa[which(dftaxa$taxa=="Vascular Plants"),]
+
+### Create legend
+
+legend<-ggplot(Amphibians, aes(y=paper.num, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  theme (#legend.position="centre",
+         legend.title=element_blank())
+legend<-get_legend(legend)
+
+### AMPHIBIAN graphs 
+
+Amph.num<-ggplot(Amphibians, aes(y=paper.num, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.num), position=position_dodge(width=0.9), vjust=-0.25, size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of papers")+
+  ggtitle("Amphibians")+
+  xlab(element_blank())+
+  ylim(0,15)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Amph.prop<-ggplot(Amphibians, aes(y=prop.paper, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.paper), position=position_dodge(width=0.9), vjust=-0.25, size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Prop of papers")+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### ARTHROPOD graphs 
+
+Arth.num<-ggplot(Arthropods, aes(y=paper.num, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.num), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ylim(0,15)+
+  #ylab("Number of CC-SDM papers")+
+  ggtitle("Arthropods")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Arth.prop<-ggplot(Arthropods, aes(y=prop.paper, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.paper), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### MAMMAL graphs 
+
+Mam.num<-ggplot(Mammals, aes(y=paper.num, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.num), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  ylim(0,15)+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ggtitle("Mammals")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Mam.prop<-ggplot(Mammals, aes(y=prop.paper, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.paper), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### REPTILE graphs 
+
+Rep.num<-ggplot(Reptiles, aes(y=paper.num, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.num), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  ylim(0,15)+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ggtitle("Reptiles")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Rep.prop<-ggplot(Reptiles, aes(y=prop.paper, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.paper), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+### VASCULAR PLANT graphs 
+
+Plant.num<-ggplot(Plants, aes(y=paper.num, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.num), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  ylim(0,15)+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  ggtitle("Vascular Plants")+
+  xlab(element_blank())+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+Plant.prop<-ggplot(Plants, aes(y=prop.paper, x=Label, fill=country.combo)) +
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=prop.paper), position=position_dodge(width=0.9), vjust=-0.25,size=3)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab(element_blank())+
+  xlab(element_blank())+
+    ylim(0,1)+
+  theme (#axis.text.x=element_text(angle=90,size=9,hjust=0.95,vjust=0.2),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="none",
+         legend.title=element_blank())
+
+plot_grid(Amph.num,Arth.num,Mam.num,Rep.num,Plant.num,Amph.prop,Arth.prop,Mam.prop,Rep.prop,Plant.prop,legend,nrow = 3,ncol=5,labels=c("A","B","C","D","E","F","G","H","I","J",""))
+
+rm(Amph.num,Amph.prop,Arth.num,Arth.prop,Mam.num,Mam.prop,Rep.num,Rep.prop,Plant.num,Plant.prop,legend)
+
+
+
+
+```
+
+### Number and proportion of species overall and in each group that have been modelled using data with different extents
+
+\*\* I will go back and look at the truncation data to make sure that it reflects what is happening at the species level, then I can add this data
+
+```{r}
+
+```
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE,fig.cap="Figure 19. Breakdown of the focal spatial extent of CC-SDMs (n=49). This data is different than Fig 18, which shows a breakdown of the spatial extent used to build the model. Instead, this graph shows what the country/countries the paper was focused on (e.g., displayed CC-SDM projections and other results). This graph shows data from all CC-SDM papers (n=49).", fig.width=7,fig.height=5}
+
+#Number of papers that focused on each combination of North American countries
+
+#*removed after our discussion last week
+
+spatial.focus.summary$Label<-with(spatial.focus.summary, reorder(country.combo, paper.num))
+
+a<-ggplot(spatial.focus.summary,aes(y=paper.num,x=Label,fill=Label))+
+  geom_bar(position="dodge", stat="identity") +
+  geom_text(aes(label=paper.num), position=position_dodge(width=0.9), vjust=-0.25)+
+  theme_classic()+
+  scale_fill_viridis(discrete=TRUE)+
+  ylab("Number of papers")+
+  xlab(element_blank())+
+  ylim(0,20)+
+  theme (axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.position="bottom",
+         legend.title=element_blank())
+
+```
